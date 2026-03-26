@@ -10,13 +10,17 @@ namespace boostchain {
 
 template<typename T>
 class Result {
+private:
+    struct ok_tag {};
+    struct error_tag {};
+
 public:
     static Result ok(T value) {
-        return Result(std::move(value));
+        return Result(std::move(value), ok_tag{});
     }
 
-    static Result error(const std::string& msg) {
-        return Result(msg);
+    static Result error(std::string msg) {
+        return Result(std::move(msg), error_tag{});
     }
 
     bool is_ok() const { return ok_value_.has_value(); }
@@ -43,18 +47,19 @@ public:
         return error_msg_;
     }
 
-    template<typename U>
-    Result<U> map(std::function<U(const T&)> fn) const {
+    template<typename F>
+    auto map(F&& func) const -> Result<decltype(func(std::declval<const T&>()))> {
+        using U = decltype(func(std::declval<const T&>()));
         if (ok_value_) {
-            return Result<U>::ok(fn(*ok_value_));
+            return Result<U>::ok(func(*ok_value_));
         } else {
             return Result<U>::error(error_msg_);
         }
     }
 
 private:
-    Result(T value) : ok_value_(std::move(value)), error_msg_("") {}
-    Result(const std::string& msg) : ok_value_(std::nullopt), error_msg_(msg) {}
+    Result(T value, ok_tag) : ok_value_(std::move(value)), error_msg_("") {}
+    Result(std::string msg, error_tag) : ok_value_(std::nullopt), error_msg_(std::move(msg)) {}
 
     std::optional<T> ok_value_;
     std::string error_msg_;

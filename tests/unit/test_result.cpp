@@ -25,7 +25,7 @@ void test_result_map() {
 
 void test_result_map_error_propagates() {
     auto r = boostchain::Result<int>::error("bad");
-    auto mapped = r.map<int>([](int x) { return x * 2; });
+    auto mapped = r.map([](int x) { return x * 2; });
     assert(mapped.is_error());
     assert(mapped.error_msg() == "bad");
 }
