@@ -2,6 +2,7 @@
 
 #include <boostchain/version.hpp>
 #include <boostchain/config.hpp>
+#include <boostchain/llm_provider.hpp>
 
 namespace boostchain {
     inline constexpr int version_major() { return BOOSTCHAIN_VERSION_MAJOR; }
