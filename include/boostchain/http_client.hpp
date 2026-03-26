@@ -4,6 +4,7 @@
 #include <boostchain/error.hpp>
 #include <string>
 #include <map>
+#include <memory>
 
 namespace boostchain {
 
@@ -42,7 +43,7 @@ public:
 
 private:
     class Impl;
-    Impl* impl_;
+    std::unique_ptr<Impl> impl_;
 };
 
 } // namespace boostchain
