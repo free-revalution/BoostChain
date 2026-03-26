@@ -24,6 +24,12 @@ target_compile_features(boostchain PUBLIC cxx_std_17)
 # Dependencies header-only
 target_include_directories(boostchain PRIVATE deps)
 
+# Source files
+target_sources(boostchain
+    PRIVATE
+        src/error.cpp
+)
+
 # Subdirectories
 if(BOOSTCHAIN_BUILD_TESTS)
     enable_testing()
