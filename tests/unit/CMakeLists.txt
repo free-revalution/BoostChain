@@ -5,3 +5,7 @@ add_test(NAME test_error COMMAND test_error)
 add_executable(test_result test_result.cpp)
 target_link_libraries(test_result boostchain::boostchain)
 add_test(NAME test_result COMMAND test_result)
+
+add_executable(test_http_client test_http_client.cpp)
+target_link_libraries(test_http_client boostchain::boostchain)
+add_test(NAME test_http_client COMMAND test_http_client)

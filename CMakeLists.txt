@@ -28,6 +28,7 @@ target_include_directories(boostchain PRIVATE deps)
 target_sources(boostchain
     PRIVATE
         src/error.cpp
+        src/http_client.cpp
 )
 
 # Subdirectories
