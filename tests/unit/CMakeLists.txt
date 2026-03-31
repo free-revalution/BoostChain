@@ -33,3 +33,7 @@ add_test(NAME test_memory COMMAND test_memory)
 add_executable(test_tool test_tool.cpp)
 target_link_libraries(test_tool boostchain::boostchain)
 add_test(NAME test_tool COMMAND test_tool)
+
+add_executable(test_executor test_executor.cpp)
+target_link_libraries(test_executor boostchain::boostchain)
+add_test(NAME test_executor COMMAND test_executor)

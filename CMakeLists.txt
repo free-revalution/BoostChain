@@ -21,6 +21,10 @@ target_include_directories(boostchain
 
 target_compile_features(boostchain PUBLIC cxx_std_17)
 
+# Threading support
+find_package(Threads REQUIRED)
+target_link_libraries(boostchain PUBLIC Threads::Threads)
+
 # Dependencies header-only
 target_include_directories(boostchain PRIVATE deps)
 
@@ -31,11 +35,14 @@ target_sources(boostchain
         src/http_client.cpp
         src/llm/openai_provider.cpp
         src/llm/openai_compatible.cpp
+        src/llm/claude_provider.cpp
+        src/llm/gemini_provider.cpp
         src/prompt.cpp
         src/chain.cpp
         src/agent.cpp
         src/memory.cpp
         src/tool.cpp
+        src/executor.cpp
 )
 
 # Subdirectories
