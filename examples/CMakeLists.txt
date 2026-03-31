@@ -1,2 +1,1 @@
-# Examples - placeholder
-# Add examples here when needed
+add_subdirectory(simple_chain)
