@@ -35,7 +35,8 @@ deps/
 test_results/
 coverage/
 
-# API Keys (important!)
+# Dev docs
+docs/
 .env
 *.env
 api_keys.txt
