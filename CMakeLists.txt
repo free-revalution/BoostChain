@@ -31,6 +31,7 @@ target_sources(boostchain
         src/http_client.cpp
         src/llm/openai_provider.cpp
         src/llm/openai_compatible.cpp
+        src/prompt.cpp
 )
 
 # Subdirectories

@@ -13,3 +13,7 @@ add_test(NAME test_http_client COMMAND test_http_client)
 add_executable(test_llm_provider_interface test_llm_provider_interface.cpp)
 target_link_libraries(test_llm_provider_interface boostchain::boostchain)
 add_test(NAME test_llm_provider_interface COMMAND test_llm_provider_interface)
+
+add_executable(test_prompt test_prompt.cpp)
+target_link_libraries(test_prompt boostchain::boostchain)
+add_test(NAME test_prompt COMMAND test_prompt)
