@@ -261,12 +261,20 @@ Chain Chain::deserialize(const std::string& data) {
         bool in_string = false;
         while (node_end < nodes_str.size()) {
             char c = nodes_str[node_end];
-            if (c == '"' && (node_end == 0 || nodes_str[node_end - 1] != '\\')) {
-                in_string = !in_string;
-            }
-            if (!in_string) {
-                if (c == '{') brace_depth++;
-                else if (c == '}') {
+            if (in_string) {
+                if (c == '\\') {
+                    node_end += 2; // skip escaped char
+                    continue;
+                }
+                if (c == '"') {
+                    in_string = false;
+                }
+            } else {
+                if (c == '"') {
+                    in_string = true;
+                } else if (c == '{') {
+                    brace_depth++;
+                } else if (c == '}') {
                     brace_depth--;
                     if (brace_depth == 0) {
                         node_end++;
@@ -301,8 +309,18 @@ Chain Chain::deserialize(const std::string& data) {
 
                 // Find the closing quote (handling escaped quotes)
                 while (tpl_quote_end < node_str.size()) {
-                    if (node_str[tpl_quote_end] == '"' && node_str[tpl_quote_end - 1] != '\\') {
-                        break;
+                    if (node_str[tpl_quote_end] == '"') {
+                        // Count preceding backslashes
+                        int num_backslashes = 0;
+                        size_t check = tpl_quote_end;
+                        while (check > 0 && node_str[check - 1] == '\\') {
+                            num_backslashes++;
+                            check--;
+                        }
+                        if (num_backslashes % 2 == 0) {
+                            // Even number of backslashes -> not escaped
+                            break;
+                        }
                     }
                     tpl_quote_end++;
                 }

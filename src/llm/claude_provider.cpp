@@ -127,7 +127,7 @@ void ClaudeProvider::chat_stream(const ChatRequest& req, StreamCallback callback
     callback(chunk);
 }
 
-EmbeddingResponse ClaudeProvider::embed(const EmbeddingRequest& req) {
+EmbeddingResponse ClaudeProvider::embed(const EmbeddingRequest& /*req*/) {
     throw APIError("Claude API does not support embeddings");
 }
 
@@ -171,27 +171,6 @@ std::string ClaudeProvider::get_base_url() const {
 int ClaudeProvider::get_timeout() const {
     std::lock_guard<std::mutex> lock(mutex_);
     return timeout_seconds_;
-}
-
-std::string ClaudeProvider::format_claude_messages(const std::vector<Message>& messages) {
-    json messages_json = json::array();
-    for (const auto& msg : messages) {
-        json msg_json;
-        switch (msg.role) {
-            case Message::user:
-                msg_json["role"] = "user";
-                break;
-            case Message::assistant:
-                msg_json["role"] = "assistant";
-                break;
-            default:
-                msg_json["role"] = "user";
-                break;
-        }
-        msg_json["content"] = msg.content;
-        messages_json.push_back(msg_json);
-    }
-    return messages_json.dump();
 }
 
 ChatResponse ClaudeProvider::parse_response(const std::string& json_str) {

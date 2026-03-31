@@ -39,7 +39,6 @@ private:
 
     mutable std::mutex mutex_;
 
-    std::string format_claude_messages(const std::vector<Message>& messages);
     ChatResponse parse_response(const std::string& json_str);
     Message::Role parse_role(const std::string& role_str);
 };

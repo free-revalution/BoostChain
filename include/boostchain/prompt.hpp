@@ -4,8 +4,6 @@
 #include <boostchain/error.hpp>
 #include <string>
 #include <map>
-#include <regex>
-#include <stdexcept>
 
 namespace boostchain {
 
@@ -19,9 +17,6 @@ public:
 
 private:
     std::string template_str_;
-    std::regex var_pattern_;
-
-    static std::regex create_var_pattern();
 };
 
 } // namespace boostchain

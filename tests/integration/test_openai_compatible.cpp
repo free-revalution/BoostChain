@@ -1,6 +1,8 @@
 #include <boostchain/llm/openai_compatible.hpp>
+#include <boostchain/error.hpp>
 #include <cassert>
 #include <iostream>
+#include <cstdlib>
 
 using namespace boostchain;
 
@@ -20,11 +22,19 @@ int main() {
     ChatRequest req;
     req.messages = {{Message::user, "Hello! What is 2+2?"}};
 
-    auto response = provider->chat(req);
+    try {
+        auto response = provider->chat(req);
 
-    assert(!response.messages.empty());
-    assert(!response.messages[0].content.empty());
-    std::cout << "DeepSeek: " << response.messages[0].content << "\n";
+        assert(!response.messages.empty());
+        assert(!response.messages[0].content.empty());
+        std::cout << "DeepSeek: " << response.messages[0].content << "\n";
+    } catch (const boostchain::Error& e) {
+        std::cerr << "TEST ERROR: " << e.what() << "\n";
+        return 1;
+    } catch (const std::exception& e) {
+        std::cerr << "UNEXPECTED ERROR: " << e.what() << "\n";
+        return 1;
+    }
 
     return 0;
 }

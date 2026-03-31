@@ -4,12 +4,7 @@
 namespace boostchain {
 
 PromptTemplate::PromptTemplate(const std::string& template_str)
-    : template_str_(template_str)
-    , var_pattern_(create_var_pattern()) {
-}
-
-std::regex PromptTemplate::create_var_pattern() {
-    return std::regex(R"(\{\{([^}]+)\}\})");
+    : template_str_(template_str) {
 }
 
 namespace {

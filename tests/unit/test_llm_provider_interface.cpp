@@ -35,7 +35,7 @@ void test_tool_definition() {
     ToolDefinition tool;
     tool.name = "http_request";
     tool.description = "Make HTTP requests";
-    tool.parameters["url"] = ToolParameter{"string", "Request URL", true};
+    tool.parameters["url"] = ToolParameter{"string", "Request URL", true, std::nullopt};
     assert(tool.name == "http_request");
     assert(tool.parameters.at("url").required == true);
 }

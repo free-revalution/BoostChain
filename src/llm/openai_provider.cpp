@@ -82,6 +82,46 @@ Result<ChatResponse> OpenAIProvider::chat_safe(const ChatRequest& req) {
             request_json["stop"] = *req.stop;
         }
 
+        // Add tool definitions if present
+        if (req.tools && !req.tools->empty()) {
+            request_json["tools"] = json::array();
+            for (const auto& tool : *req.tools) {
+                json tool_json;
+                tool_json["type"] = "function";
+                tool_json["function"]["name"] = tool.name;
+                tool_json["function"]["description"] = tool.description;
+
+                json parameters = json::object();
+                parameters["type"] = "object";
+                json props = json::object();
+                json required = json::array();
+
+                for (const auto& [name, param] : tool.parameters) {
+                    json param_json;
+                    param_json["type"] = param.type;
+                    param_json["description"] = param.description;
+                    if (param.enum_values) {
+                        param_json["enum"] = json::parse(*param.enum_values);
+                    }
+                    props[name] = param_json;
+                    if (param.required) {
+                        required.push_back(name);
+                    }
+                }
+
+                parameters["properties"] = props;
+                if (!required.empty()) {
+                    parameters["required"] = required;
+                }
+                tool_json["function"]["parameters"] = parameters;
+                request_json["tools"].push_back(tool_json);
+            }
+        }
+
+        if (req.tool_choice) {
+            request_json["tool_choice"] = *req.tool_choice;
+        }
+
         std::string url = base_url + "/chat/completions";
         std::string request_body = request_json.dump();
 
@@ -270,46 +310,6 @@ std::string OpenAIProvider::format_messages(const std::vector<Message>& messages
     return messages_json.dump();
 }
 
-std::string OpenAIProvider::format_tools(const std::vector<ToolDefinition>& tools) {
-    json tools_json = json::array();
-    for (const auto& tool : tools) {
-        json tool_json;
-        tool_json["type"] = "function";
-        tool_json["function"]["name"] = tool.name;
-        tool_json["function"]["description"] = tool.description;
-
-        json parameters = json::object();
-        parameters["type"] = "object";
-
-        json props = json::object();
-        json required = json::array();
-
-        for (const auto& [name, param] : tool.parameters) {
-            json param_json;
-            param_json["type"] = param.type;
-            param_json["description"] = param.description;
-
-            if (param.enum_values) {
-                param_json["enum"] = json::parse(*param.enum_values);
-            }
-
-            props[name] = param_json;
-            if (param.required) {
-                required.push_back(name);
-            }
-        }
-
-        parameters["properties"] = props;
-        if (!required.empty()) {
-            parameters["required"] = required;
-        }
-
-        tool_json["function"]["parameters"] = parameters;
-        tools_json.push_back(tool_json);
-    }
-    return tools_json.dump();
-}
-
 ChatResponse OpenAIProvider::parse_response(const std::string& json_str) {
     try {
         json response_json = json::parse(json_str);
@@ -339,10 +339,24 @@ ChatResponse OpenAIProvider::parse_response(const std::string& json_str) {
                 const auto& msg_json = choice["message"];
                 Message msg;
                 msg.role = parse_role(msg_json["role"]);
-                msg.content = msg_json["content"];
+                msg.content = msg_json.value("content", "");
 
                 if (msg_json.contains("name") && !msg_json["name"].is_null()) {
                     msg.name = msg_json["name"];
+                }
+
+                // Parse tool_calls from the response
+                if (msg_json.contains("tool_calls") && msg_json["tool_calls"].is_array()) {
+                    for (const auto& tc : msg_json["tool_calls"]) {
+                        ToolCall tool_call;
+                        tool_call.id = tc.value("id", "");
+                        tool_call.name = tc["function"].value("name", "");
+                        tool_call.arguments = tc["function"].value("arguments", "");
+                        // For now, attach the first tool call to the message
+                        if (!msg.tool_call.has_value()) {
+                            msg.tool_call = tool_call;
+                        }
+                    }
                 }
 
                 response.messages.push_back(msg);

@@ -1,5 +1,4 @@
-#ifndef BOOSTCHAIN_CHAIN_HPP
-#define BOOSTCHAIN_CHAIN_HPP
+#pragma once
 
 #include <string>
 #include <vector>
@@ -54,5 +53,3 @@ private:
 };
 
 } // namespace boostchain
-
-#endif // BOOSTCHAIN_CHAIN_HPP

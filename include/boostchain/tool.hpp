@@ -1,5 +1,4 @@
-#ifndef BOOSTCHAIN_TOOL_HPP
-#define BOOSTCHAIN_TOOL_HPP
+#pragma once
 
 #include <boostchain/llm_provider.hpp>
 #include <string>
@@ -41,5 +40,3 @@ public:
 };
 
 } // namespace boostchain
-
-#endif // BOOSTCHAIN_TOOL_HPP

@@ -1,5 +1,4 @@
-#ifndef BOOSTCHAIN_MEMORY_HPP
-#define BOOSTCHAIN_MEMORY_HPP
+#pragma once
 
 #include <string>
 #include <vector>
@@ -120,5 +119,3 @@ private:
 };
 
 } // namespace boostchain
-
-#endif // BOOSTCHAIN_MEMORY_HPP

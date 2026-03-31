@@ -84,12 +84,6 @@ HttpResponse HttpClient::get(const std::string& url) {
         response.headers[key] = value;
     }
 
-    if (response.status_code >= 400) {
-        throw NetworkError("HTTP GET failed with status " +
-                          std::to_string(response.status_code),
-                          response.status_code);
-    }
-
     return response;
 }
 
@@ -116,12 +110,6 @@ HttpResponse HttpClient::post(const std::string& url,
     HttpResponse response;
     response.status_code = result->status;
     response.body = result->body;
-
-    if (response.status_code >= 400) {
-        throw NetworkError("HTTP POST failed with status " +
-                          std::to_string(response.status_code),
-                          response.status_code);
-    }
 
     return response;
 }

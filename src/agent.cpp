@@ -3,6 +3,7 @@
 #include <stdexcept>
 #include <sstream>
 #include <algorithm>
+#include <cstdio>
 
 namespace boostchain {
 
@@ -200,10 +201,13 @@ AgentResult Agent::run_with_tools(const std::string& user_input) {
         result.final_answer = std::string("Error: ") + e.what();
     }
 
-    // Update conversation history: store the user message and final assistant messages
-    conversation_history_.push_back(Message(Message::user, user_input));
-    for (size_t i = 1; i < messages.size(); ++i) {
-        // Skip the system prompt (if present) and the user message we just added
+    // Update conversation history with only the NEW messages from this run.
+    // messages = [system_prompt?, ...old_history..., user_input, ...new_llm/tool_msgs...]
+    // We skip the system prompt (index 0) and the old history (indices 1..history_size).
+    size_t history_size = conversation_history_.size();
+    // messages layout: [system?] [old_history_0..old_history_{n-1}] [user_input] [new_messages...]
+    size_t user_msg_index = system_prompt_.empty() ? 0 : 1 + history_size;
+    for (size_t i = user_msg_index; i < messages.size(); ++i) {
         conversation_history_.push_back(messages[i]);
     }
 
@@ -214,25 +218,38 @@ AgentResult Agent::run_with_tools(const std::string& user_input) {
 // Persistence
 // ============================================================================
 
+// Helper: JSON-escape a string for save_state output
+static std::string json_escape(const std::string& s) {
+    std::string result;
+    result.reserve(s.size() + 16);
+    for (unsigned char c : s) {
+        switch (c) {
+            case '"':  result += "\\\""; break;
+            case '\\': result += "\\\\"; break;
+            case '\n': result += "\\n";  break;
+            case '\t': result += "\\t";  break;
+            case '\r': result += "\\r";  break;
+            case '\b': result += "\\b";  break;
+            case '\f': result += "\\f";  break;
+            default:
+                if (c < 0x20) {
+                    char buf[8];
+                    std::snprintf(buf, sizeof(buf), "\\u%04x", c);
+                    result += buf;
+                } else {
+                    result += static_cast<char>(c);
+                }
+                break;
+        }
+    }
+    return result;
+}
+
 std::string Agent::save_state() const {
     std::ostringstream oss;
 
     oss << "{\n";
-    oss << "  \"system_prompt\": ";
-
-    // Write system_prompt as JSON string (simple escaping)
-    oss << "\"";
-    for (char c : system_prompt_) {
-        switch (c) {
-            case '"': oss << "\\\""; break;
-            case '\\': oss << "\\\\"; break;
-            case '\n': oss << "\\n"; break;
-            case '\t': oss << "\\t"; break;
-            case '\r': oss << "\\r"; break;
-            default: oss << c;
-        }
-    }
-    oss << "\",\n";
+    oss << "  \"system_prompt\": \"" << json_escape(system_prompt_) << "\",\n";
 
     oss << "  \"conversation_history\": [\n";
     for (size_t i = 0; i < conversation_history_.size(); ++i) {
@@ -246,29 +263,10 @@ std::string Agent::save_state() const {
             case Message::tool: oss << "\"tool\""; break;
         }
 
-        oss << ", \"content\": \"";
-        for (char c : msg.content) {
-            switch (c) {
-                case '"': oss << "\\\""; break;
-                case '\\': oss << "\\\\"; break;
-                case '\n': oss << "\\n"; break;
-                case '\t': oss << "\\t"; break;
-                case '\r': oss << "\\r"; break;
-                default: oss << c;
-            }
-        }
-        oss << "\"";
+        oss << ", \"content\": \"" << json_escape(msg.content) << "\"";
 
         if (msg.name.has_value()) {
-            oss << ", \"name\": \"";
-            for (char c : msg.name.value()) {
-                switch (c) {
-                    case '"': oss << "\\\""; break;
-                    case '\\': oss << "\\\\"; break;
-                    default: oss << c;
-                }
-            }
-            oss << "\"";
+            oss << ", \"name\": \"" << json_escape(msg.name.value()) << "\"";
         }
 
         oss << "}";
@@ -280,8 +278,6 @@ std::string Agent::save_state() const {
 
     return oss.str();
 }
-
-namespace {
 
 // Minimal JSON parser for load_state
 struct JsonReader {
@@ -403,6 +399,8 @@ struct JsonReader {
 };
 
 } // anonymous namespace
+
+namespace boostchain {
 
 bool Agent::load_state(const std::string& json_data) {
     try {

@@ -62,11 +62,31 @@ std::string ShortTermMemory::serialize() const {
         auto ts = std::chrono::duration_cast<std::chrono::nanoseconds>(
             item.timestamp.time_since_epoch()).count();
         oss << ts << "|" << item.relevance << "|" << item.content.size()
-            << "|" << item.content;
+            << "|";
+        // Write content, escaping pipe and backslash
+        for (char c : item.content) {
+            if (c == '\\') oss << "\\\\";
+            else if (c == '\n') oss << "\\n";
+            else if (c == '|') oss << "\\p";
+            else oss << c;
+        }
         // Serialize metadata
         oss << "|" << item.metadata.size();
         for (const auto& [k, v] : item.metadata) {
-            oss << "|" << k.size() << "|" << k << "|" << v.size() << "|" << v;
+            oss << "|" << k.size() << "|";
+            for (char c : k) {
+                if (c == '\\') oss << "\\\\";
+                else if (c == '\n') oss << "\\n";
+                else if (c == '|') oss << "\\p";
+                else oss << c;
+            }
+            oss << "|" << v.size() << "|";
+            for (char c : v) {
+                if (c == '\\') oss << "\\\\";
+                else if (c == '\n') oss << "\\n";
+                else if (c == '|') oss << "\\p";
+                else oss << c;
+            }
         }
         oss << "\n";
     }
@@ -83,80 +103,123 @@ void ShortTermMemory::deserialize(const std::string& data) {
     // Parse header: "short_term|max_items|count"
     size_t pos1 = header.find('|');
     if (pos1 == std::string::npos) return;
-    size_t pos2 = header.find('|', pos1 + 1);
-    if (pos2 == std::string::npos) return;
-
-    // max_items_ = std::stoul(header.substr(pos1 + 1, pos2 - pos1 - 1));
-    // We keep max_items_ as configured; just read items
+    // max_items_ stays as configured
 
     std::string line;
     while (std::getline(iss, line)) {
         if (line.empty()) continue;
 
-        MemoryItem item;
-        size_t pos = 0;
+        try {
+            MemoryItem item;
+            size_t pos = 0;
 
-        // Parse timestamp
-        size_t sep = line.find('|', pos);
-        long long ts_ns = std::stoll(line.substr(pos, sep - pos));
-        item.timestamp = std::chrono::system_clock::time_point(
-            std::chrono::duration_cast<std::chrono::system_clock::duration>(
-                std::chrono::nanoseconds(ts_ns)));
-        pos = sep + 1;
-
-        // Parse relevance
-        sep = line.find('|', pos);
-        item.relevance = std::stod(line.substr(pos, sep - pos));
-        pos = sep + 1;
-
-        // Parse content
-        sep = line.find('|', pos);
-        size_t content_len = std::stoul(line.substr(pos, sep - pos));
-        pos = sep + 1;
-        item.content = line.substr(pos, content_len);
-        pos += content_len;
-
-        // Parse metadata count - skip '|' if we're right at it
-        if (pos < line.size() && line[pos] == '|') pos++;
-        if (pos >= line.size()) {
-            items_.push_back(item);
-            continue;
-        }
-        sep = line.find('|', pos);
-        size_t meta_count = 0;
-        if (sep != std::string::npos) {
-            meta_count = std::stoul(line.substr(pos, sep - pos));
+            // Parse timestamp
+            size_t sep = line.find('|', pos);
+            if (sep == std::string::npos) continue;
+            long long ts_ns = std::stoll(line.substr(pos, sep - pos));
+            item.timestamp = std::chrono::system_clock::time_point(
+                std::chrono::duration_cast<std::chrono::system_clock::duration>(
+                    std::chrono::nanoseconds(ts_ns)));
             pos = sep + 1;
-        } else {
-            meta_count = std::stoul(line.substr(pos));
-        }
 
-        for (size_t i = 0; i < meta_count; ++i) {
-            // key size
+            // Parse relevance
             sep = line.find('|', pos);
-            size_t klen = std::stoul(line.substr(pos, sep - pos));
+            if (sep == std::string::npos) continue;
+            item.relevance = std::stod(line.substr(pos, sep - pos));
             pos = sep + 1;
-            // key
-            std::string key = line.substr(pos, klen);
-            pos += klen;
-            // skip '|' separator before value size
-            if (pos < line.size() && line[pos] == '|') pos++;
-            // value size
+
+            // Parse content length (before unescaping)
             sep = line.find('|', pos);
-            size_t vlen = 0;
+            if (sep == std::string::npos) continue;
+            size_t content_len = std::stoul(line.substr(pos, sep - pos));
+            pos = sep + 1;
+
+            // Read exactly content_len raw bytes (may contain escaped sequences)
+            std::string raw_content = line.substr(pos, content_len);
+            pos += content_len;
+
+            // Unescape content
+            item.content.clear();
+            for (size_t ci = 0; ci < raw_content.size(); ++ci) {
+                if (raw_content[ci] == '\\' && ci + 1 < raw_content.size()) {
+                    char next = raw_content[ci + 1];
+                    if (next == 'n') { item.content += '\n'; ci++; }
+                    else if (next == 'p') { item.content += '|'; ci++; }
+                    else if (next == '\\') { item.content += '\\'; ci++; }
+                    else { item.content += raw_content[ci]; }
+                } else {
+                    item.content += raw_content[ci];
+                }
+            }
+
+            // Parse metadata
+            if (pos >= line.size()) {
+                items_.push_back(item);
+                continue;
+            }
+            if (line[pos] == '|') pos++;
+            sep = line.find('|', pos);
+            size_t meta_count = 0;
             if (sep != std::string::npos) {
-                vlen = std::stoul(line.substr(pos, sep - pos));
+                meta_count = std::stoul(line.substr(pos, sep - pos));
                 pos = sep + 1;
             } else {
-                vlen = std::stoul(line.substr(pos));
+                meta_count = std::stoul(line.substr(pos));
             }
-            // value
-            std::string val = line.substr(pos, vlen);
-            pos += vlen;
-            item.metadata[key] = val;
-        }
 
-        items_.push_back(item);
+            for (size_t i = 0; i < meta_count; ++i) {
+                // key size
+                sep = line.find('|', pos);
+                if (sep == std::string::npos) break;
+                size_t klen = std::stoul(line.substr(pos, sep - pos));
+                pos = sep + 1;
+                std::string raw_key = line.substr(pos, klen);
+                pos += klen;
+
+                // Unescape key
+                std::string key;
+                for (size_t ci = 0; ci < raw_key.size(); ++ci) {
+                    if (raw_key[ci] == '\\' && ci + 1 < raw_key.size()) {
+                        char next = raw_key[ci + 1];
+                        if (next == 'n') { key += '\n'; ci++; }
+                        else if (next == 'p') { key += '|'; ci++; }
+                        else if (next == '\\') { key += '\\'; ci++; }
+                        else { key += raw_key[ci]; }
+                    } else { key += raw_key[ci]; }
+                }
+
+                if (pos < line.size() && line[pos] == '|') pos++;
+                // value size
+                sep = line.find('|', pos);
+                size_t vlen = 0;
+                if (sep != std::string::npos) {
+                    vlen = std::stoul(line.substr(pos, sep - pos));
+                    pos = sep + 1;
+                } else {
+                    vlen = std::stoul(line.substr(pos));
+                }
+                std::string raw_val = line.substr(pos, vlen);
+                pos += vlen;
+
+                // Unescape value
+                std::string val;
+                for (size_t ci = 0; ci < raw_val.size(); ++ci) {
+                    if (raw_val[ci] == '\\' && ci + 1 < raw_val.size()) {
+                        char next = raw_val[ci + 1];
+                        if (next == 'n') { val += '\n'; ci++; }
+                        else if (next == 'p') { val += '|'; ci++; }
+                        else if (next == '\\') { val += '\\'; ci++; }
+                        else { val += raw_val[ci]; }
+                    } else { val += raw_val[ci]; }
+                }
+
+                item.metadata[key] = val;
+            }
+
+            items_.push_back(item);
+        } catch (...) {
+            // Skip malformed items
+        }
     }
 }
 
@@ -277,10 +340,29 @@ std::string LongTermMemory::serialize() const {
         auto ts = std::chrono::duration_cast<std::chrono::nanoseconds>(
             item.timestamp.time_since_epoch()).count();
         oss << ts << "|" << item.relevance << "|" << item.content.size()
-            << "|" << item.content;
+            << "|";
+        for (char c : item.content) {
+            if (c == '\\') oss << "\\\\";
+            else if (c == '\n') oss << "\\n";
+            else if (c == '|') oss << "\\p";
+            else oss << c;
+        }
         oss << "|" << item.metadata.size();
         for (const auto& [k, v] : item.metadata) {
-            oss << "|" << k.size() << "|" << k << "|" << v.size() << "|" << v;
+            oss << "|" << k.size() << "|";
+            for (char c : k) {
+                if (c == '\\') oss << "\\\\";
+                else if (c == '\n') oss << "\\n";
+                else if (c == '|') oss << "\\p";
+                else oss << c;
+            }
+            oss << "|" << v.size() << "|";
+            for (char c : v) {
+                if (c == '\\') oss << "\\\\";
+                else if (c == '\n') oss << "\\n";
+                else if (c == '|') oss << "\\p";
+                else oss << c;
+            }
         }
         oss << "\n";
     }
@@ -297,71 +379,101 @@ void LongTermMemory::deserialize(const std::string& data) {
     std::getline(iss, header);
     if (header.empty()) return;
 
-    // Parse header: "long_term|max_items|count"
-    // We keep max_items_ as configured
+    // Helper lambda to unescape serialized strings
+    auto unescape = [](const std::string& raw) -> std::string {
+        std::string result;
+        for (size_t ci = 0; ci < raw.size(); ++ci) {
+            if (raw[ci] == '\\' && ci + 1 < raw.size()) {
+                char next = raw[ci + 1];
+                if (next == 'n') { result += '\n'; ci++; }
+                else if (next == 'p') { result += '|'; ci++; }
+                else if (next == '\\') { result += '\\'; ci++; }
+                else { result += raw[ci]; }
+            } else { result += raw[ci]; }
+        }
+        return result;
+    };
 
     std::string line;
     while (std::getline(iss, line)) {
         if (line.empty()) continue;
 
-        MemoryItem item;
-        size_t pos = 0;
+        try {
+            MemoryItem item;
+            size_t pos = 0;
 
-        // Parse timestamp
-        size_t sep = line.find('|', pos);
-        long long ts_ns = std::stoll(line.substr(pos, sep - pos));
-        item.timestamp = std::chrono::system_clock::time_point(
-            std::chrono::duration_cast<std::chrono::system_clock::duration>(
-                std::chrono::nanoseconds(ts_ns)));
-        pos = sep + 1;
+            // Parse timestamp
+            size_t sep = line.find('|', pos);
+            if (sep == std::string::npos) continue;
+            long long ts_ns = std::stoll(line.substr(pos, sep - pos));
+            item.timestamp = std::chrono::system_clock::time_point(
+                std::chrono::duration_cast<std::chrono::system_clock::duration>(
+                    std::chrono::nanoseconds(ts_ns)));
+            pos = sep + 1;
 
-        // Parse relevance
-        sep = line.find('|', pos);
-        item.relevance = std::stod(line.substr(pos, sep - pos));
-        pos = sep + 1;
+            // Parse relevance
+            sep = line.find('|', pos);
+            if (sep == std::string::npos) continue;
+            item.relevance = std::stod(line.substr(pos, sep - pos));
+            pos = sep + 1;
 
-        // Parse content
-        sep = line.find('|', pos);
-        size_t content_len = std::stoul(line.substr(pos, sep - pos));
-        pos = sep + 1;
-        item.content = line.substr(pos, content_len);
-        pos += content_len;
+            // Parse content length
+            sep = line.find('|', pos);
+            if (sep == std::string::npos) continue;
+            size_t content_len = std::stoul(line.substr(pos, sep - pos));
+            pos = sep + 1;
+            std::string raw_content = line.substr(pos, content_len);
+            pos += content_len;
+            item.content = unescape(raw_content);
 
-        // Parse metadata count - skip '|' if we're right at it
-        if (pos < line.size() && line[pos] == '|') pos++;
-        if (pos >= line.size()) {
+            // Parse metadata
+            if (pos >= line.size()) {
+                items_.push_back(item);
+                if (embed_fn_) {
+                    embeddings_.push_back(embed_fn_(item.content));
+                } else {
+                    embeddings_.emplace_back();
+                }
+                continue;
+            }
+            if (line[pos] == '|') pos++;
+            sep = line.find('|', pos);
+            size_t meta_count = 0;
+            if (sep != std::string::npos) {
+                meta_count = std::stoul(line.substr(pos, sep - pos));
+                pos = sep + 1;
+            } else {
+                meta_count = std::stoul(line.substr(pos));
+            }
+
+            for (size_t i = 0; i < meta_count; ++i) {
+                sep = line.find('|', pos);
+                if (sep == std::string::npos) break;
+                size_t klen = std::stoul(line.substr(pos, sep - pos));
+                pos = sep + 1;
+                std::string raw_key = line.substr(pos, klen);
+                pos += klen;
+                sep = line.find('|', pos);
+                size_t vlen = 0;
+                if (sep != std::string::npos) {
+                    vlen = std::stoul(line.substr(pos, sep - pos));
+                    pos = sep + 1;
+                } else {
+                    vlen = std::stoul(line.substr(pos));
+                }
+                std::string raw_val = line.substr(pos, vlen);
+                pos += vlen;
+                item.metadata[unescape(raw_key)] = unescape(raw_val);
+            }
+
             items_.push_back(item);
-            continue;
-        }
-        sep = line.find('|', pos);
-        size_t meta_count = 0;
-        if (sep != std::string::npos) {
-            meta_count = std::stoul(line.substr(pos, sep - pos));
-            pos = sep + 1;
-        } else {
-            meta_count = std::stoul(line.substr(pos));
-        }
-
-        for (size_t i = 0; i < meta_count; ++i) {
-            sep = line.find('|', pos);
-            size_t klen = std::stoul(line.substr(pos, sep - pos));
-            pos = sep + 1;
-            std::string key = line.substr(pos, klen);
-            pos += klen;
-            sep = line.find('|', pos);
-            size_t vlen = std::stoul(line.substr(pos, sep - pos));
-            pos = sep + 1;
-            std::string val = line.substr(pos, vlen);
-            pos += vlen;
-            item.metadata[key] = val;
-        }
-
-        items_.push_back(item);
-        // Re-embed on deserialize if function available
-        if (embed_fn_) {
-            embeddings_.push_back(embed_fn_(item.content));
-        } else {
-            embeddings_.emplace_back();
+            if (embed_fn_) {
+                embeddings_.push_back(embed_fn_(item.content));
+            } else {
+                embeddings_.emplace_back();
+            }
+        } catch (...) {
+            // Skip malformed items
         }
     }
 }

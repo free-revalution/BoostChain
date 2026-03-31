@@ -1,6 +1,8 @@
 #include <boostchain/llm/claude_provider.hpp>
+#include <boostchain/error.hpp>
 #include <cassert>
 #include <iostream>
+#include <cstdlib>
 
 using namespace boostchain;
 
@@ -18,29 +20,37 @@ int main() {
     assert(provider.get_model() == "claude-3-5-sonnet-20241022");
     assert(provider.get_base_url() == "https://api.anthropic.com/v1");
 
-    ChatRequest req;
-    req.model = "claude-3-5-sonnet-20241022";
-    req.messages = {{Message::user, "Say 'Hello, BoostChain!' in one line."}};
-    req.max_tokens = 100;
+    try {
+        ChatRequest req;
+        req.model = "claude-3-5-sonnet-20241022";
+        req.messages = {{Message::user, "Say 'Hello, BoostChain!' in one line."}};
+        req.max_tokens = 100;
 
-    auto response = provider.chat(req);
+        auto response = provider.chat(req);
 
-    assert(!response.messages.empty());
-    assert(!response.messages[0].content.empty());
-    std::cout << "Claude Response: " << response.messages[0].content << "\n";
+        assert(!response.messages.empty());
+        assert(!response.messages[0].content.empty());
+        std::cout << "Claude Response: " << response.messages[0].content << "\n";
 
-    // Test with system message
-    ChatRequest req2;
-    req2.model = "claude-3-5-sonnet-20241022";
-    req2.messages = {
-        {Message::system, "You are a helpful assistant that only speaks in French."},
-        {Message::user, "Say hello."}
-    };
-    req2.max_tokens = 100;
+        // Test with system message
+        ChatRequest req2;
+        req2.model = "claude-3-5-sonnet-20241022";
+        req2.messages = {
+            {Message::system, "You are a helpful assistant that only speaks in French."},
+            {Message::user, "Say hello."}
+        };
+        req2.max_tokens = 100;
 
-    auto response2 = provider.chat(req2);
-    assert(!response2.messages.empty());
-    std::cout << "Claude System Response: " << response2.messages[0].content << "\n";
+        auto response2 = provider.chat(req2);
+        assert(!response2.messages.empty());
+        std::cout << "Claude System Response: " << response2.messages[0].content << "\n";
+    } catch (const boostchain::Error& e) {
+        std::cerr << "TEST ERROR: " << e.what() << "\n";
+        return 1;
+    } catch (const std::exception& e) {
+        std::cerr << "UNEXPECTED ERROR: " << e.what() << "\n";
+        return 1;
+    }
 
     std::cout << "All Claude provider tests PASSED!\n";
     return 0;

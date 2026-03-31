@@ -1,5 +1,4 @@
-#ifndef BOOSTCHAIN_RESULT_HPP
-#define BOOSTCHAIN_RESULT_HPP
+#pragma once
 
 #include <optional>
 #include <string>
@@ -66,5 +65,3 @@ private:
 };
 
 } // namespace boostchain
-
-#endif // BOOSTCHAIN_RESULT_HPP

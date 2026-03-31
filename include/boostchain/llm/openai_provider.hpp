@@ -39,10 +39,9 @@ private:
 
     mutable std::mutex mutex_;  // Protects configuration members
 
-    std::string format_messages(const std::vector<Message>& messages);
-    std::string format_tools(const std::vector<ToolDefinition>& tools);
     ChatResponse parse_response(const std::string& json_str);
     Message::Role parse_role(const std::string& role_str);
+    std::string format_messages(const std::vector<Message>& messages);
 };
 
 } // namespace boostchain
