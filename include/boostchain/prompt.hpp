@@ -1,17 +1,13 @@
 #ifndef BOOSTCHAIN_PROMPT_HPP
 #define BOOSTCHAIN_PROMPT_HPP
 
+#include <boostchain/error.hpp>
 #include <string>
 #include <map>
 #include <regex>
 #include <stdexcept>
 
 namespace boostchain {
-
-class ConfigError : public std::runtime_error {
-public:
-    explicit ConfigError(const std::string& msg) : std::runtime_error(msg) {}
-};
 
 using Variables = std::map<std::string, std::string>;
 

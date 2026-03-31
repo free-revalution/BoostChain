@@ -17,3 +17,7 @@ add_test(NAME test_llm_provider_interface COMMAND test_llm_provider_interface)
 add_executable(test_prompt test_prompt.cpp)
 target_link_libraries(test_prompt boostchain::boostchain)
 add_test(NAME test_prompt COMMAND test_prompt)
+
+add_executable(test_chain test_chain.cpp)
+target_link_libraries(test_chain boostchain::boostchain)
+add_test(NAME test_chain COMMAND test_chain)

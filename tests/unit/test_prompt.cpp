@@ -45,10 +45,22 @@ void test_no_variables() {
     assert(result == "Just static text");
 }
 
+void test_replacement_contains_braces() {
+    // Test that replacement text containing {{ doesn't get re-processed
+    PromptTemplate tpl("Template: {{var1}} and {{var2}}");
+    Variables vars;
+    vars["var1"] = "value with {{braces}}";
+    vars["var2"] = "normal value";
+
+    std::string result = tpl.render(vars);
+    assert(result == "Template: value with {{braces}} and normal value");
+}
+
 int main() {
     test_simple_template();
     test_multiple_variables();
     test_missing_variable();
     test_no_variables();
+    test_replacement_contains_braces();
     return 0;
 }
