@@ -119,7 +119,7 @@ BoostChain uses a **four-layer architecture** where each layer depends only on t
 +--------------------------------+---------------------------------+
                                  |
 +--------------------------------+---------------------------------+
-|                    Infrastructure Layer                           |
+|                    Infrastructure Layer                          |
 |   HttpClient  |  nlohmann/json  |  cpp-httplib  |  pthreads      |
 +------------------------------------------------------------------+
 ```
