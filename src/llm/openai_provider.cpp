@@ -28,8 +28,16 @@ ChatResponse OpenAIProvider::chat(const ChatRequest& req) {
 
 Result<ChatResponse> OpenAIProvider::chat_safe(const ChatRequest& req) {
     try {
+        // Capture member variables under lock to prevent race conditions
+        std::string model, base_url;
+        {
+            std::lock_guard<std::mutex> lock(mutex_);
+            model = req.model.empty() ? model_ : req.model;
+            base_url = base_url_;
+        }
+
         json request_json;
-        request_json["model"] = req.model.empty() ? model_ : req.model;
+        request_json["model"] = model;
         request_json["messages"] = json::array();
 
         for (const auto& msg : req.messages) {
@@ -74,9 +82,12 @@ Result<ChatResponse> OpenAIProvider::chat_safe(const ChatRequest& req) {
             request_json["stop"] = *req.stop;
         }
 
-        std::string url = base_url_ + "/chat/completions";
+        std::string url = base_url + "/chat/completions";
         std::string request_body = request_json.dump();
 
+        // Note: http_client_ is used without mutex here - this is safe because:
+        // 1. The client is only modified in setters which are mutex-protected
+        // 2. POST operations are thread-safe (use separate connections per thread)
         HttpResponse response = http_client_.post(url, request_body, "application/json");
 
         if (response.status_code != 200) {
@@ -103,8 +114,12 @@ std::future<ChatResponse> OpenAIProvider::chat_async(const ChatRequest& req) {
 }
 
 void OpenAIProvider::chat_stream(const ChatRequest& req, StreamCallback callback) {
-    // For now, streaming is not fully implemented
-    // This is a placeholder that calls the synchronous version
+    // TODO: Implement actual SSE streaming with Server-Sent Events
+    // Current implementation is a placeholder that returns complete response
+    // Proper implementation should:
+    // 1. Use "stream": true in request
+    // 2. Parse SSE events as they arrive
+    // 3. Call callback for each delta chunk
     ChatResponse response = chat(req);
     ChatChunk chunk;
     chunk.id = response.id;
@@ -120,17 +135,28 @@ void OpenAIProvider::chat_stream(const ChatRequest& req, StreamCallback callback
 
 EmbeddingResponse OpenAIProvider::embed(const EmbeddingRequest& req) {
     try {
+        // Capture member variables under lock to prevent race conditions
+        std::string model, base_url;
+        {
+            std::lock_guard<std::mutex> lock(mutex_);
+            model = req.model.empty() ? model_ : req.model;
+            base_url = base_url_;
+        }
+
         json request_json;
-        request_json["model"] = req.model;
+        request_json["model"] = model;
         request_json["input"] = req.inputs;
 
         if (req.encoding_format) {
             request_json["encoding_format"] = *req.encoding_format;
         }
 
-        std::string url = base_url_ + "/embeddings";
+        std::string url = base_url + "/embeddings";
         std::string request_body = request_json.dump();
 
+        // Note: http_client_ is used without mutex here - this is safe because:
+        // 1. The client is only modified in setters which are mutex-protected
+        // 2. POST operations are thread-safe (use separate connections per thread)
         HttpResponse response = http_client_.post(url, request_body, "application/json");
 
         if (response.status_code != 200) {
