@@ -1,20 +1,30 @@
+<!-- BoostChain: C++ LLM Agent Framework — like LangChain but for C++ -->
 <p align="center">
   <img src="https://img.shields.io/badge/C++-17-blue.svg" alt="C++17">
   <img src="https://img.shields.io/badge/CMake-3.15+-green.svg" alt="CMake">
-  <img src="https://img.shields.io/badge/Version-0.1.0-orange.svg" alt="Version">
   <img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License">
+  <img src="https://img.shields.io/badge/LLM-Agent_Framework-orange.svg" alt="Agent Framework">
 </p>
 
 <h1 align="center">BoostChain</h1>
 
 <p align="center">
-  <strong>A lightweight, high-performance C++ framework for building LLM-powered Agents.</strong>
-  <br>Inspired by <a href="https://python.langchain.com">LangChain</a>, designed for C++.
+  <strong>C++ Agent Framework for LLM Applications</strong>
+  <br>Build AI agents, chains, and tools with OpenAI, Claude, Gemini, DeepSeek, and more — in C++.
+</p>
+
+<p align="center">
+  <a href="#quick-start">Quick Start</a> ·
+  <a href="#llm-provider-setup">Providers</a> ·
+  <a href="#code-examples">Examples</a> ·
+  <a href="CONTRIBUTING.md">Contributing</a>
 </p>
 
 ---
 
-BoostChain provides a composable, interface-driven architecture for orchestrating Large Language Model (LLM) interactions in C++. It supports **chain-based workflows**, **autonomous agents with tool calling**, **memory management**, and **universal multi-provider support** — all compiled into a single static library with zero runtime dependencies.
+BoostChain provides a composable, interface-driven architecture for orchestrating LLM interactions in C++. It supports **chain-based workflows**, **autonomous agents with tool calling**, **memory management**, and **universal multi-provider support** — all compiled into a single static library with zero runtime dependencies.
+
+Think of it as **LangChain for C++**: same concepts (chains, agents, tools, memory), but designed for performance-critical and embedded environments where Python isn't an option.
 
 ## Features
 
@@ -655,6 +665,54 @@ public:
 ---
 
 ## Code Examples
+
+### 30-Second Agent with Tool Calling
+
+```cpp
+#include <boostchain/agent.hpp>
+#include <boostchain/tool.hpp>
+#include <boostchain/llm/openai_compatible.hpp>
+#include <iostream>
+
+int main() {
+    // Use any LLM provider — DeepSeek, Kimi, GLM, Qwen, OpenAI...
+    auto llm = std::make_shared<boostchain::OpenAICompatibleProvider>(
+        "https://api.deepseek.com/v1", std::getenv("DEEPSEEK_API_KEY")
+    );
+    llm->set_model("deepseek-chat");
+
+    // Create an agent with a built-in calculator tool
+    boostchain::Agent agent(llm, {std::make_shared<boostchain::CalculatorTool>()});
+
+    // The agent reasons, calls tools, and iterates automatically
+    auto result = agent.run("What is (123 + 456) * 789?");
+    std::cout << result.final_answer << std::endl;  // "456615"
+    std::cout << "Steps: " << result.steps_taken << std::endl;  // 2
+
+    // Multi-turn: context is preserved
+    auto r2 = agent.run("Divide that by 100.");
+    std::cout << r2.final_answer << std::endl;  // "4566.15"
+
+    // Save and restore state
+    std::ofstream("state.json") << agent.save_state();
+}
+```
+
+### Simple Chain
+
+```cpp
+auto llm = std::make_shared<boostchain::OpenAIProvider>("sk-...");
+
+boostchain::Chain chain;
+chain.add_prompt("Translate to {{language}}: {{text}}")
+     .add_llm(llm);
+
+auto result = chain.run({
+    {"language", "French"},
+    {"text", "Hello, world!"}
+});
+// result.output → "Bonjour, le monde !"
+```
 
 ### Multi-Provider Agent
 
