@@ -34,6 +34,8 @@ target_sources(boostchain
         src/prompt.cpp
         src/chain.cpp
         src/agent.cpp
+        src/memory.cpp
+        src/tool.cpp
 )
 
 # Subdirectories

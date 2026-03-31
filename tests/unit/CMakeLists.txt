@@ -25,3 +25,11 @@ add_test(NAME test_chain COMMAND test_chain)
 add_executable(test_agent test_agent.cpp)
 target_link_libraries(test_agent boostchain::boostchain)
 add_test(NAME test_agent COMMAND test_agent)
+
+add_executable(test_memory test_memory.cpp)
+target_link_libraries(test_memory boostchain::boostchain)
+add_test(NAME test_memory COMMAND test_memory)
+
+add_executable(test_tool test_tool.cpp)
+target_link_libraries(test_tool boostchain::boostchain)
+add_test(NAME test_tool COMMAND test_tool)
