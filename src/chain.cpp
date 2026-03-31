@@ -1,6 +1,7 @@
 #include <boostchain/chain.hpp>
 #include <boostchain/prompt.hpp>
 #include <boostchain/error.hpp>
+#include <boostchain/llm_provider.hpp>
 #include <sstream>
 #include <stdexcept>
 
@@ -112,23 +113,66 @@ private:
 
 class LLMNode : public Chain::INode {
 public:
-    explicit LLMNode(const std::string& model_name = "")
-        : model_name_(model_name) {}
+    explicit LLMNode(std::shared_ptr<ILLMProvider> provider)
+        : provider_(std::move(provider)) {}
 
     ChainResult execute(const std::map<std::string, std::string>& vars) const override {
         ChainResult result;
-        result.success = false;
-        result.error = "LLM node not yet implemented";
-        result.output = "";
         result.variables = vars;
+
+        if (!provider_) {
+            result.success = false;
+            result.error = "LLM provider is null";
+            result.output = "";
+            return result;
+        }
+
+        try {
+            ChatRequest request;
+            request.model = provider_->get_model();
+
+            // Build messages from accumulated variables
+            // Use "last_output" if present, otherwise combine all variables
+            std::string input;
+            auto it = vars.find("last_output");
+            if (it != vars.end()) {
+                input = it->second;
+            } else {
+                for (const auto& kv : vars) {
+                    if (!input.empty()) input += "\n";
+                    input += kv.first + ": " + kv.second;
+                }
+            }
+
+            if (!input.empty()) {
+                request.messages.push_back(Message(Message::user, input));
+            }
+
+            ChatResponse response = provider_->chat(request);
+
+            if (!response.messages.empty()) {
+                result.output = response.messages.back().content;
+            } else {
+                result.output = "";
+            }
+            result.success = true;
+
+            // Store the output for downstream nodes
+            result.variables["last_output"] = result.output;
+        } catch (const std::exception& e) {
+            result.success = false;
+            result.error = std::string("LLM call failed: ") + e.what();
+            result.output = "";
+        }
+
         return result;
     }
 
     std::string serialize() const override {
         std::ostringstream oss;
         oss << "{\"type\":\"llm\"";
-        if (!model_name_.empty()) {
-            oss << ",\"model\":\"" << model_name_ << "\"";
+        if (provider_) {
+            oss << ",\"model\":\"" << provider_->get_model() << "\"";
         }
         oss << "}";
         return oss.str();
@@ -139,7 +183,7 @@ public:
     }
 
 private:
-    std::string model_name_;
+    std::shared_ptr<ILLMProvider> provider_;
 };
 
 // ============================================================================
@@ -148,6 +192,11 @@ private:
 
 Chain& Chain::add_prompt(const std::string& template_str) {
     nodes_.push_back(std::make_shared<PromptNode>(template_str));
+    return *this;
+}
+
+Chain& Chain::add_llm(std::shared_ptr<ILLMProvider> provider) {
+    nodes_.push_back(std::make_shared<LLMNode>(std::move(provider)));
     return *this;
 }
 

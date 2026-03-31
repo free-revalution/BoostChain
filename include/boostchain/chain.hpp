@@ -5,6 +5,7 @@
 #include <vector>
 #include <memory>
 #include <map>
+#include <boostchain/llm_provider.hpp>
 
 namespace boostchain {
 
@@ -26,6 +27,10 @@ public:
     // Add a prompt template node to the chain.
     // Returns *this for method chaining.
     Chain& add_prompt(const std::string& template_str);
+
+    // Add an LLM node to the chain with the given provider.
+    // Returns *this for method chaining.
+    Chain& add_llm(std::shared_ptr<ILLMProvider> provider);
 
     // Serialize the chain to a string representation.
     std::string serialize() const;
