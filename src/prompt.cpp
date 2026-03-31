@@ -1,4 +1,5 @@
 #include <boostchain/prompt.hpp>
+#include <set>
 
 namespace boostchain {
 
@@ -11,52 +12,69 @@ std::regex PromptTemplate::create_var_pattern() {
     return std::regex(R"(\{\{([^}]+)\}\})");
 }
 
+namespace {
+
+std::string trim(const std::string& s) {
+    auto start = s.find_first_not_of(" \t\n\r");
+    if (start == std::string::npos) return "";
+    auto end = s.find_last_not_of(" \t\n\r");
+    return s.substr(start, end - start + 1);
+}
+
+} // anonymous namespace
+
 std::string PromptTemplate::render(const Variables& vars) const {
-    std::string result = template_str_;
-    std::sregex_iterator it(result.begin(), result.end(), var_pattern_);
-    std::sregex_iterator end;
-
-    // First pass: check for missing variables
-    for (std::sregex_iterator i = it; i != end; ++i) {
-        std::smatch match = *i;
-        std::string var_name = match[1].str();
-
-        // Trim whitespace from variable name
-        size_t start = var_name.find_first_not_of(" \t\n\r");
-        size_t end = var_name.find_last_not_of(" \t\n\r");
-
-        if (start == std::string::npos) {
-            throw ConfigError("Empty variable name in template");
+    // First pass: collect variable names and check for missing ones
+    std::set<std::string> seen;
+    std::set<std::string> required;
+    size_t pos = 0;
+    while (pos < template_str_.size()) {
+        size_t open_pos = template_str_.find("{{", pos);
+        if (open_pos == std::string::npos) break;
+        size_t close_pos = template_str_.find("}}", open_pos);
+        if (close_pos == std::string::npos) break;
+        std::string var_name = trim(template_str_.substr(open_pos + 2, close_pos - open_pos - 2));
+        if (!var_name.empty()) {
+            required.insert(var_name);
         }
+        pos = close_pos + 2;
+    }
 
-        std::string trimmed_name = var_name.substr(start, end - start + 1);
-
-        if (vars.find(trimmed_name) == vars.end()) {
-            throw ConfigError("Missing variable: " + trimmed_name);
+    for (const auto& name : required) {
+        if (vars.find(name) == vars.end()) {
+            throw ConfigError("Missing variable: " + name);
         }
     }
 
-    // Second pass: replace variables
-    it = std::sregex_iterator(result.begin(), result.end(), var_pattern_);
-    size_t pos = 0;
-
-    while (it != end) {
-        std::smatch match = *it;
-        std::string var_name = match[1].str();
-
-        // Trim whitespace from variable name
-        size_t start = var_name.find_first_not_of(" \t\n\r");
-        size_t end = var_name.find_last_not_of(" \t\n\r");
-        std::string trimmed_name = var_name.substr(start, end - start + 1);
-
-        auto var_it = vars.find(trimmed_name);
-        if (var_it != vars.end()) {
-            result.replace(match.position(), match.length(), var_it->second);
-            // Update iterator to continue from after the replacement
-            it = std::sregex_iterator(result.begin(), result.end(), var_pattern_);
-        } else {
-            ++it;
+    // Single-pass replacement: build result incrementally
+    std::string result;
+    pos = 0;
+    while (pos < template_str_.size()) {
+        size_t open_pos = template_str_.find("{{", pos);
+        if (open_pos == std::string::npos) {
+            result.append(template_str_, pos);
+            break;
         }
+
+        // Append text before {{var}}
+        result.append(template_str_, pos, open_pos - pos);
+
+        size_t close_pos = template_str_.find("}}", open_pos);
+        if (close_pos == std::string::npos) {
+            result.append(template_str_, open_pos);
+            break;
+        }
+
+        // Extract and trim variable name
+        std::string var_name = trim(template_str_.substr(open_pos + 2, close_pos - open_pos - 2));
+
+        // Lookup and append replacement
+        auto it = vars.find(var_name);
+        if (it != vars.end()) {
+            result.append(it->second);
+        }
+
+        pos = close_pos + 2;
     }
 
     return result;
