@@ -1,0 +1,17 @@
+{
+  "name": "cc-make",
+  "version": "0.1.0",
+  "description": "C++ Claude Code reimplementation",
+  "dependencies": [
+    "nlohmann-json",
+    "cli11",
+    "spdlog",
+    "fmt",
+    "catch2",
+    "pcre2",
+    "libcurl",
+    "yaml-cpp",
+    "boost-asio",
+    "boost-beast"
+  ]
+}
