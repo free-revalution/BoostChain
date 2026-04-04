@@ -40,7 +40,7 @@ Frame TreeRenderer::render(Component* root, int width, int height) {
     frame.viewport_height = height;
 
     // 5. Save as previous frame and return
-    prev_frame_ = frame;
+    prev_frame_ = frame;  // Copy (screen is valid at this point)
     return frame;
 }
 

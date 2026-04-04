@@ -20,6 +20,7 @@ public:
 private:
     std::string buffer_;
     SSEEvent current_;
+    bool data_field_seen_ = false;
 
     void process_line(const std::string& line, std::vector<SSEEvent>& events);
     void emit_current(std::vector<SSEEvent>& events);

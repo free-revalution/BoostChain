@@ -44,11 +44,12 @@ std::vector<SSEEvent> SSEParser::feed(const std::string& data) {
 
 void SSEParser::process_line(const std::string& line, std::vector<SSEEvent>& events) {
     if (line.empty()) {
-        // Empty line triggers event emission
-        if (!current_.data.empty() || !current_.event_type.empty()) {
+        // Empty line triggers event emission if we have any data or event type.
+        if (data_field_seen_ || !current_.event_type.empty()) {
             emit_current(events);
         }
         current_ = SSEEvent{};
+        data_field_seen_ = false;
         return;
     }
 
@@ -77,11 +78,12 @@ void SSEParser::process_line(const std::string& line, std::vector<SSEEvent>& eve
     if (field == "event") {
         current_.event_type = value;
     } else if (field == "data") {
-        if (current_.data.empty()) {
-            current_.data = value;
-        } else {
+        if (data_field_seen_) {
             current_.data += "\n" + value;
+        } else {
+            current_.data = value;
         }
+        data_field_seen_ = true;
     } else if (field == "id") {
         current_.id = value;
     } else if (field == "retry") {
@@ -101,6 +103,7 @@ void SSEParser::emit_current(std::vector<SSEEvent>& events) {
 void SSEParser::reset() {
     buffer_.clear();
     current_ = SSEEvent{};
+    data_field_seen_ = false;
 }
 
 }  // namespace ccmake

@@ -105,6 +105,8 @@ TEST_CASE("SSE parser handles field without colon") {
     SSEParser parser;
     auto events = parser.feed("data\ndata: actual\n\n");
     REQUIRE(events.size() == 1);
+    // "data" without colon is treated as field "data" with empty value,
+    // then "data: actual" appends. Result: "\nactual"
     REQUIRE(events[0].data == "\nactual");
 }
 

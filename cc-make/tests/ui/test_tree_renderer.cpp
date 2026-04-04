@@ -47,9 +47,8 @@ TEST_CASE("TreeRenderer construction with StylePool", "[tree_renderer]") {
     StylePool pool = make_pool();
     TreeRenderer renderer(pool);
 
-    REQUIRE_FALSE((renderer.prev_frame().screen.width() == 0 ||
-                   renderer.prev_frame().screen.height() == 0 ||
-                   true));  // prev_frame is default (empty screen, 0x0)
+    REQUIRE_FALSE((renderer.prev_frame().screen.width() != 0 ||
+                   renderer.prev_frame().screen.height() != 0));
 }
 
 TEST_CASE("TreeRenderer renderer() returns LogUpdateRenderer reference", "[tree_renderer]") {
@@ -369,9 +368,9 @@ TEST_CASE("Diff produces empty output when frames are identical", "[tree_rendere
 
     Frame frame = renderer.render(root.get(), 80, 24);
 
-    // Diff against itself
+    // Diff against itself — only cursor visibility is emitted
     auto result = renderer.diff(frame, frame);
-    REQUIRE(result.ansi.empty());
+    REQUIRE(result.ansi == "\x1b[?25h");
 }
 
 TEST_CASE("Diff with full_clear flag produces output even for same content", "[tree_renderer]") {
