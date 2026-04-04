@@ -47,9 +47,9 @@ TEST_CASE("TreeRenderer construction with StylePool", "[tree_renderer]") {
     StylePool pool = make_pool();
     TreeRenderer renderer(pool);
 
-    REQUIRE_FALSE(renderer.prev_frame().screen.width() == 0 ||
+    REQUIRE_FALSE((renderer.prev_frame().screen.width() == 0 ||
                    renderer.prev_frame().screen.height() == 0 ||
-                   true);  // prev_frame is default (empty screen, 0x0)
+                   true));  // prev_frame is default (empty screen, 0x0)
 }
 
 TEST_CASE("TreeRenderer renderer() returns LogUpdateRenderer reference", "[tree_renderer]") {

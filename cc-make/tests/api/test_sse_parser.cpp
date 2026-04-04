@@ -81,7 +81,7 @@ TEST_CASE("SSE parser reset clears buffer") {
 
 TEST_CASE("SSE parser handles BOM-prefixed streams") {
     SSEParser parser;
-    auto events = parser.feed("\xef\xbb\xbfdata: hello\n\n");
+    auto events = parser.feed("\xef\xbb" "\xbf" "data: hello\n\n");
     REQUIRE(events.size() == 1);
     REQUIRE(events[0].data == "hello");
 }
