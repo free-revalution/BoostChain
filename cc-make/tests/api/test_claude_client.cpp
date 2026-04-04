@@ -37,7 +37,7 @@ TEST_CASE("StreamSession accumulates tool use") {
     s.on_content_block_start(StreamContentBlockStart{0, APIBlockStartToolUse{"toolu_1", "Read", ""}});
     s.on_content_block_delta(StreamContentBlockDelta{0, APIDeltaToolInput{"{\"path\":"}});
     s.on_content_block_delta(StreamContentBlockDelta{0, APIDeltaToolInput{"\"/tmp\""}});
-    s.on_content_block_delta(StreamContentBlockDelta{0, APIDeltaToolInput{"}"}}});
+    s.on_content_block_delta(StreamContentBlockDelta{0, APIDeltaToolInput{"}"}});
     s.on_content_block_stop(StreamContentBlockStop{0});
     REQUIRE(s.content_blocks.size() == 1);
     auto* tool = std::get_if<ToolUseBlock>(&s.content_blocks[0]);
