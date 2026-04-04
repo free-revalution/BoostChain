@@ -37,6 +37,9 @@ coverage/
 
 # Dev docs
 docs/
+
+# Claude Code
+claude-code-main/
 .env
 *.env
 api_keys.txt

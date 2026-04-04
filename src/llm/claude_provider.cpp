@@ -3,6 +3,7 @@
 #include <json.hpp>
 #include <sstream>
 
+// ClaudeProvider 类的实现
 using json = nlohmann::json;
 
 namespace boostchain {
@@ -18,6 +19,7 @@ ClaudeProvider::ClaudeProvider(const std::string& api_key,
     http_client_.set_header("anthropic-version", "2023-06-01");
 }
 
+// 调用 Claude 模型
 ChatResponse ClaudeProvider::chat(const ChatRequest& req) {
     auto result = chat_safe(req);
     if (result.is_error()) {
@@ -26,6 +28,7 @@ ChatResponse ClaudeProvider::chat(const ChatRequest& req) {
     return result.unwrap();
 }
 
+// 调用 Claude 模型，返回结果
 Result<ChatResponse> ClaudeProvider::chat_safe(const ChatRequest& req) {
     try {
         std::string model, base_url;
@@ -106,12 +109,15 @@ Result<ChatResponse> ClaudeProvider::chat_safe(const ChatRequest& req) {
     }
 }
 
+// 异步调用 Claude 模型
 std::future<ChatResponse> ClaudeProvider::chat_async(const ChatRequest& req) {
     return std::async(std::launch::async, [this, req]() {
         return chat(req);
     });
 }
+// 调用 Claude 模型，返回流式结果
 
+// 流式调用 Claude 模型
 void ClaudeProvider::chat_stream(const ChatRequest& req, StreamCallback callback) {
     // TODO: Implement actual SSE streaming
     ChatResponse response = chat(req);
