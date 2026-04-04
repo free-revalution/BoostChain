@@ -8,7 +8,7 @@ namespace ccmake {
 
 // A frame represents the rendered output of a single UI update
 struct Frame {
-    Screen screen;
+    Screen screen{0, 0};  // Default: empty screen
     int viewport_width = 0;
     int viewport_height = 0;
     Cursor cursor;

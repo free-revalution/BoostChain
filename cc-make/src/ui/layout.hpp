@@ -118,6 +118,15 @@ public:
     explicit TextNode(const std::string& text) : text_(text) {}
     std::pair<float, float> measure(float width, float height) override;
 
+    // Leaf node -- no children
+    int child_count() const override { return 0; }
+    LayoutNode* child_at(int) override { return nullptr; }
+    void add_child(LayoutNode*) override {}
+    void remove_child(LayoutNode*) override {}
+
+    // Update text content (for when component text changes)
+    void set_text(const std::string& text) { text_ = text; }
+
 private:
     std::string text_;
 };
