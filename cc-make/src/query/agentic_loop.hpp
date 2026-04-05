@@ -34,7 +34,8 @@ using APICallFunction = std::function<Message(
 TurnResult run_agentic_loop(
     APICallFunction api_call,
     const AgenticLoopConfig& config,
-    const Message& user_message
+    const Message& user_message,
+    const std::vector<Message>& history = {}
 );
 
 }  // namespace ccmake

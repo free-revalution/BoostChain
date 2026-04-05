@@ -5,11 +5,14 @@ namespace ccmake {
 TurnResult run_agentic_loop(
     APICallFunction api_call,
     const AgenticLoopConfig& config,
-    const Message& user_message
+    const Message& user_message,
+    const std::vector<Message>& history
 ) {
     TurnResult result;
     LoopState state;
 
+    // Start with existing history, then append the new user message
+    state.messages = history;
     state.messages.push_back(user_message);
 
     auto check_abort = [&]() -> bool {
