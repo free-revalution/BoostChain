@@ -60,6 +60,8 @@ bool Repl::resume_session(const std::string& session_id) {
 
 int Repl::process_prompt(const std::string& prompt) {
     try {
+        renderer_.reset();
+
         auto result = engine_.submit_message(prompt);
 
         if (result.exit_reason == LoopExitReason::Aborted) {
@@ -69,6 +71,8 @@ int Repl::process_prompt(const std::string& prompt) {
         } else if (result.exit_reason == LoopExitReason::ModelError) {
             std::cout << "\n[Model error: " << result.error_message << "]\n";
         }
+
+        renderer_.on_complete();
 
         display_response(result);
     } catch (const std::exception& e) {

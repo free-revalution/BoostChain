@@ -4,6 +4,8 @@
 #include "auth/auth.hpp"
 #include "config/config_loader.hpp"
 #include "query/query_engine.hpp"
+#include "query/context.hpp"
+#include "git/git.hpp"
 #include "tools/file/read_tool.hpp"
 #include "tools/file/edit_tool.hpp"
 #include "tools/file/write_tool.hpp"
@@ -145,15 +147,70 @@ int run_cli(int argc, char** argv) {
         spdlog::debug("Prompt: {}", args.prompt);
     }
 
-    // Print/Doctor modes are stubs for now — they will be implemented in later phases
+    // Print system prompt
     if (args.mode == CLIMode::Print) {
-        spdlog::info("System prompt printing not yet implemented");
+        auto settings = build_runtime_settings(std::filesystem::current_path());
+
+        std::string cwd = std::filesystem::current_path().string();
+        auto user_context = build_user_context(cwd);
+        auto system_context = build_system_context(cwd);
+        QueryConfig query_cfg;
+        query_cfg.model = args.model.empty() ? settings.effective_model : args.model;
+        query_cfg.system_prompt = "";
+        auto prompt = build_system_prompt(query_cfg, user_context, system_context);
+
+        std::cout << prompt;
         return 0;
     }
 
+    // Doctor mode
     if (args.mode == CLIMode::Doctor) {
-        spdlog::info("Doctor mode not yet implemented");
-        return 0;
+        int issues = 0;
+
+        std::cout << "cc-make Doctor\n\n";
+
+        // Check API key
+        auto api_key = std::getenv("ANTHROPIC_API_KEY");
+        if (api_key && std::strlen(api_key) > 10) {
+            std::cout << "  \033[32m✓\033[0m API key: found (" << std::string(api_key, 0, 8) << "...)\n";
+        } else {
+            std::cout << "  \033[31m✗\033[0m API key: not set (ANTHROPIC_API_KEY)\n";
+            ++issues;
+        }
+
+        // Check git
+        auto git = get_git_status(std::filesystem::current_path());
+        if (git.is_git) {
+            std::cout << "  \033[32m✓\033[0m Git repo: " << git.branch << "\n";
+        } else {
+            std::cout << "  \033[33m!\033[0m Git repo: not in a git repository\n";
+            ++issues;
+        }
+
+        // Check config
+        auto global_dir = get_global_config_dir();
+        if (std::filesystem::is_directory(global_dir)) {
+            std::cout << "  \033[32m✓\033[0m Config dir: " << global_dir.string() << "\n";
+        } else {
+            std::cout << "  \033[33m!\033[0m Config dir: not created yet\n";
+        }
+
+        // Check CLAUDE.md
+        auto claude_md = discover_claude_md(std::filesystem::current_path());
+        if (claude_md) {
+            std::cout << "  \033[32m✓\033[0m CLAUDE.md: found\n";
+        } else {
+            std::cout << "  \033[33m!\033[0m CLAUDE.md: not found\n";
+        }
+
+        std::cout << "\n";
+        if (issues == 0) {
+            std::cout << "No issues found.\n";
+        } else {
+            std::cout << issues << " issue(s) found.\n";
+        }
+
+        return issues > 0 ? 1 : 0;
     }
 
     // REPL/interactive loop

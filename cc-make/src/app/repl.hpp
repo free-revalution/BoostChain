@@ -4,6 +4,7 @@
 #include "app/app_state.hpp"
 #include "query/query_engine.hpp"
 #include "session/session.hpp"
+#include "ui/streaming_renderer.hpp"
 
 #include <string>
 #include <functional>
@@ -42,6 +43,7 @@ private:
     QueryEngine& engine_;
     CLIArgs args_;
     SessionStore session_store_;
+    StreamingRenderer renderer_;
     bool running_ = true;
 };
 
