@@ -22,8 +22,33 @@ void QueryEngine::register_tool(const std::string& name, ToolExecuteFunction fn)
 }
 
 bool QueryEngine::has_tool(const std::string& name) const {
-    return tool_executor_.has_tool(name);
+    return tool_executor_.has_tool(name) || tool_registry_.has(name);
 }
+
+bool QueryEngine::register_tool(std::unique_ptr<ToolBase> tool) {
+    if (!tool) return false;
+    const auto& def = tool->definition();
+    auto tool_name = def.name;
+
+    // Bridge: register a ToolExecuteFunction that calls the tool
+    auto tool_ptr = tool.get();  // capture raw pointer (owned by registry)
+    tool_executor_.register_tool(tool_name,
+        [tool_ptr](const std::string& name, const nlohmann::json& input) -> nlohmann::json {
+            ToolContext ctx;
+            auto output = tool_ptr->execute(input, ctx);
+            if (output.is_error) {
+                throw std::runtime_error(output.content);
+            }
+            // Return the content as JSON string
+            return output.content;
+        }
+    );
+
+    return tool_registry_.register_tool(std::move(tool));
+}
+
+ToolRegistry& QueryEngine::tool_registry() { return tool_registry_; }
+const ToolRegistry& QueryEngine::tool_registry() const { return tool_registry_; }
 
 const std::vector<Message>& QueryEngine::messages() const { return messages_; }
 

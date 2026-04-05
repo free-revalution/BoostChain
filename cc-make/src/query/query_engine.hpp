@@ -2,6 +2,7 @@
 
 #include "query/types.hpp"
 #include "query/tool_executor.hpp"
+#include "tools/registry.hpp"
 #include "api/types.hpp"
 
 #include <string>
@@ -24,9 +25,14 @@ public:
     void set_max_tokens(int64_t max_tokens);
     void set_thinking(const std::optional<APIThinkingConfig>& thinking);
 
-    // Tool registration
+    // Tool registration (via function)
     void register_tool(const std::string& name, ToolExecuteFunction fn);
     bool has_tool(const std::string& name) const;
+
+    // Tool registration (via ToolBase subclass)
+    bool register_tool(std::unique_ptr<ToolBase> tool);
+    ToolRegistry& tool_registry();
+    const ToolRegistry& tool_registry() const;
 
     // Main entry point: submit a user message and run the agentic loop
     TurnResult submit_message(const std::string& prompt);
@@ -52,6 +58,7 @@ private:
     std::optional<APIThinkingConfig> thinking_;
 
     ToolExecutor tool_executor_;
+    ToolRegistry tool_registry_;
     std::vector<Message> messages_;
 
     AbortSignal abort_signal_;
