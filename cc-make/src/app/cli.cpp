@@ -1,11 +1,21 @@
 #include "app/cli.hpp"
 #include "app/app_state.hpp"
+#include "app/repl.hpp"
 #include "auth/auth.hpp"
+#include "config/config_loader.hpp"
+#include "query/query_engine.hpp"
+#include "tools/file/read_tool.hpp"
+#include "tools/file/edit_tool.hpp"
+#include "tools/file/write_tool.hpp"
+#include "tools/bash/bash_tool.hpp"
+#include "tools/search/glob_tool.hpp"
+#include "tools/search/grep_tool.hpp"
 
 #include <CLI/CLI.hpp>
 #include <spdlog/spdlog.h>
 
 #include <iostream>
+#include <filesystem>
 #include <unistd.h>
 
 namespace ccmake {
@@ -146,7 +156,39 @@ int run_cli(int argc, char** argv) {
         return 0;
     }
 
-    // REPL/interactive loop will be implemented in Phase 7
+    // REPL/interactive loop
+    // Build query engine with default tools
+    std::string cwd = std::filesystem::current_path().string();
+
+    QueryEngine engine(args.model.empty() ? "claude-sonnet-4-20250514" : args.model);
+    engine.set_cwd(cwd);
+
+    // Load and apply config
+    auto settings = build_runtime_settings(cwd);
+    if (!settings.effective_model.empty() && args.model.empty()) {
+        engine.set_model(settings.effective_model);
+    }
+    apply_config_to_engine(settings.global_config, engine);
+
+    // Register built-in tools
+    engine.register_tool(std::make_unique<ReadTool>());
+    engine.register_tool(std::make_unique<EditTool>());
+    engine.register_tool(std::make_unique<WriteTool>());
+    engine.register_tool(std::make_unique<BashTool>());
+    engine.register_tool(std::make_unique<GlobTool>());
+    engine.register_tool(std::make_unique<GrepTool>());
+
+    // Create REPL
+    Repl repl(engine, args);
+
+    if (args.mode == CLIMode::Pipe && !args.prompt.empty()) {
+        return repl.process_prompt(args.prompt);
+    }
+
+    if (args.mode == CLIMode::Interactive) {
+        return repl.run();
+    }
+
     return 0;
 }
 
