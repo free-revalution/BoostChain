@@ -3,6 +3,9 @@
 #include "tools/file/read_tool.hpp"
 #include "tools/file/edit_tool.hpp"
 #include "tools/file/write_tool.hpp"
+#include "tools/bash/bash_tool.hpp"
+#include "tools/search/glob_tool.hpp"
+#include "tools/search/grep_tool.hpp"
 #include "tools/tool.hpp"
 #include "tools/registry.hpp"
 #include <nlohmann/json.hpp>
@@ -146,4 +149,112 @@ TEST_CASE("Integration: Write then Read then Edit") {
     REQUIRE(content == "Goodbye World\n");
 
     std::filesystem::remove(test_file);
+}
+
+// ============================================================
+// Phase 6 tool integration: Bash, Glob, Grep
+// ============================================================
+
+TEST_CASE("QueryEngine register Bash + Glob + Grep tools") {
+    QueryEngine engine("test-model");
+    engine.register_tool(std::make_unique<BashTool>());
+    engine.register_tool(std::make_unique<GlobTool>());
+    engine.register_tool(std::make_unique<GrepTool>());
+
+    REQUIRE(engine.has_tool("Bash"));
+    REQUIRE(engine.has_tool("Glob"));
+    REQUIRE(engine.has_tool("Grep"));
+
+    auto defs = engine.tool_registry().all_definitions();
+    REQUIRE(defs.size() == 3);
+}
+
+TEST_CASE("Integration: Bash echo + Read verify") {
+    static int counter = 0;
+    auto test_file = "/tmp/ccmake_bash_int_" + std::to_string(counter++) + ".txt";
+
+    QueryEngine engine("test-model");
+    engine.set_cwd("/tmp");
+    engine.register_tool(std::make_unique<BashTool>());
+    engine.register_tool(std::make_unique<ReadTool>());
+
+    // Mock: model writes a file via bash, then reads it
+    engine.set_mock_responses({
+        Message::assistant("a1", {ToolUseBlock{"t1", "Bash", {{"command", "echo 'bash-created-content' > " + test_file}}}}),
+        Message::assistant("a2", {ToolUseBlock{"t2", "Read", {{"file_path", test_file}}}}),
+        Message::assistant("a3", {TextBlock{"Verified content."}})
+    });
+
+    auto result = engine.submit_message("Create and verify file");
+    REQUIRE(result.exit_reason == LoopExitReason::Completed);
+    REQUIRE(result.error_message.empty());
+
+    std::filesystem::remove(test_file);
+}
+
+TEST_CASE("Integration: Glob + Grep workflow") {
+    static int counter = 0;
+    auto dir = "/tmp/ccmake_globgrep_" + std::to_string(counter++);
+    std::filesystem::create_directories(dir);
+    std::ofstream(dir + "/app.js") << "const x = 1;\n";
+    std::ofstream(dir + "/util.js") << "const y = 2;\n";
+    std::ofstream(dir + "/README.md") << "# Test\n";
+    std::filesystem::create_directories(dir + "/src");
+    std::ofstream(dir + "/src/main.cpp") << "int main() { return 0; }\n";
+
+    QueryEngine engine("test-model");
+    engine.set_cwd(dir);
+    engine.register_tool(std::make_unique<GlobTool>());
+    engine.register_tool(std::make_unique<GrepTool>());
+
+    // Mock: model globs *.js then greps for a pattern
+    engine.set_mock_responses({
+        Message::assistant("a1", {ToolUseBlock{"t1", "Glob", {{"pattern", "*.js"}}}}),
+        Message::assistant("a2", {ToolUseBlock{"t2", "Grep", {{"pattern", "const"}}}}),
+        Message::assistant("a3", {TextBlock{"Found matches."}})
+    });
+
+    auto result = engine.submit_message("Find JS files and search for const");
+    REQUIRE(result.exit_reason == LoopExitReason::Completed);
+    REQUIRE(result.error_message.empty());
+
+    // Verify the engine processed both tools (message history has tool results)
+    auto msgs = engine.messages();
+    int tool_results = 0;
+    for (const auto& msg : msgs) {
+        for (const auto& block : msg.content) {
+            if (std::holds_alternative<ToolResultBlock>(block)) {
+                ++tool_results;
+            }
+        }
+    }
+    REQUIRE(tool_results == 2);
+
+    std::filesystem::remove_all(dir);
+}
+
+TEST_CASE("Integration: all Phase 5+6 tools registered together") {
+    QueryEngine engine("test-model");
+    engine.register_tool(std::make_unique<ReadTool>());
+    engine.register_tool(std::make_unique<EditTool>());
+    engine.register_tool(std::make_unique<WriteTool>());
+    engine.register_tool(std::make_unique<BashTool>());
+    engine.register_tool(std::make_unique<GlobTool>());
+    engine.register_tool(std::make_unique<GrepTool>());
+
+    REQUIRE(engine.has_tool("Read"));
+    REQUIRE(engine.has_tool("Edit"));
+    REQUIRE(engine.has_tool("Write"));
+    REQUIRE(engine.has_tool("Bash"));
+    REQUIRE(engine.has_tool("Glob"));
+    REQUIRE(engine.has_tool("Grep"));
+
+    auto defs = engine.tool_registry().all_definitions();
+    REQUIRE(defs.size() == 6);
+
+    // Verify all have schemas
+    for (const auto& def : defs) {
+        REQUIRE_FALSE(def.name.empty());
+        REQUIRE_FALSE(def.input_schema.is_null());
+    }
 }
