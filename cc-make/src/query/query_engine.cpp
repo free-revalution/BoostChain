@@ -63,6 +63,10 @@ void QueryEngine::set_session_id(const std::string& id) { session_id_ = id; }
 std::string QueryEngine::session_id() const { return session_id_; }
 void QueryEngine::enable_auto_save(bool enabled) { auto_save_ = enabled; }
 
+void QueryEngine::enable_real_api(const ClaudeClientConfig& config) {
+    api_client_ = std::make_unique<ClaudeClient>(config);
+}
+
 void QueryEngine::set_mock_response(const Message& response) {
     mock_responses_ = {response};
     mock_index_ = 0;
@@ -101,17 +105,45 @@ TurnResult QueryEngine::submit_message(const std::string& prompt) {
 
     // Build API call function
     auto api_call = [this](
-        const std::vector<Message>& /*messages*/,
-        const std::string& /*system_prompt*/,
-        const std::vector<APIToolDefinition>& /*tools*/,
-        QueryEventCallback /*on_event*/,
-        const std::vector<APIToolDefinition>& /*api_tools*/
+        const std::vector<Message>& messages,
+        const std::string& system_prompt,
+        const std::vector<APIToolDefinition>& tools,
+        QueryEventCallback on_event,
+        const std::vector<APIToolDefinition>& api_tools
     ) -> Message {
         if (use_mock_) {
             return next_mock_response();
         }
-        // Real API call would go through ClaudeClient here
-        return Message::assistant("a", {TextBlock{"(not connected)"}});
+
+        // Real API mode via ClaudeClient
+        if (api_client_) {
+            ClaudeClientConfig client_config;
+            client_config.model = model_;
+            client_config.max_tokens = max_tokens_;
+            client_config.thinking = thinking_;
+            if (!system_prompt.empty()) {
+                client_config.system_prompt = system_prompt;
+            }
+
+            // Build tool definitions
+            for (const auto& def : api_tools) {
+                client_config.tools.push_back({def.name, def.description, def.input_schema});
+            }
+
+            // Wrap API stream events and forward to our QueryEvent callback
+            auto adapted_callback = [&on_event](const APIStreamEvent& api_evt) {
+                // APIStreamEvent contains StreamSession-related events, not QueryEvents
+                // The ClaudeClient handles StreamSession internally and returns
+                // a complete Message. We don't forward individual stream events here.
+                // The on_event callback is used by the agentic loop for QueryEvents.
+                (void)api_evt;
+            };
+
+            return api_client_->query(messages, adapted_callback);
+        }
+
+        // No client, not in mock mode — return placeholder
+        return Message::assistant("a", {TextBlock{"(not connected to API)"}});
     };
 
     // Configure agentic loop

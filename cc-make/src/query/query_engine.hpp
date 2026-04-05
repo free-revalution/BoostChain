@@ -4,6 +4,8 @@
 #include "query/tool_executor.hpp"
 #include "tools/registry.hpp"
 #include "api/types.hpp"
+#include "api/claude_client.hpp"
+#include "api/messages.hpp"
 #include "permissions/permission_manager.hpp"
 #include "session/session.hpp"
 
@@ -56,6 +58,9 @@ public:
     std::string session_id() const;
     void enable_auto_save(bool enabled);
 
+    // Real API mode: connect to ClaudeClient
+    void enable_real_api(const ClaudeClientConfig& config);
+
     // Mock support for testing
     void set_mock_response(const Message& response);
     void set_mock_responses(const std::vector<Message>& responses);
@@ -79,6 +84,8 @@ private:
     std::string session_id_;
     bool auto_save_ = false;
     bool use_mock_ = false;
+    std::unique_ptr<ClaudeClient> api_client_;
+    QueryEventCallback event_callback_;
     std::vector<Message> mock_responses_;
     size_t mock_index_ = 0;
 
