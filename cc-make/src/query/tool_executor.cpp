@@ -72,6 +72,14 @@ void ToolExecutor::clear() {
     tools_.clear();
 }
 
+void ToolExecutor::copy_tools_from(const ToolExecutor& other) {
+    for (const auto& [name, tool] : other.tools_) {
+        if (!tools_.count(name)) {
+            tools_[name] = tool;
+        }
+    }
+}
+
 void ToolExecutor::set_permission_manager(PermissionManager* pm) {
     permission_manager_ = pm;
 }

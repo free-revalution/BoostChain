@@ -100,6 +100,21 @@ void ToolRegistry::clear() {
     aliases_.clear();
 }
 
+void ToolRegistry::copy_definitions_from(const ToolRegistry& other) {
+    for (const auto& [name, tool] : other.tools_) {
+        if (!tools_.count(name)) {
+            // Create a lightweight copy with just the definition
+            // We use the existing tool's definition
+            aliases_[name] = name;  // Register the name in our alias map
+        }
+    }
+    for (const auto& [alias, canonical] : other.aliases_) {
+        if (!aliases_.count(alias)) {
+            aliases_[alias] = canonical;
+        }
+    }
+}
+
 size_t ToolRegistry::size() const {
     return tools_.size();
 }

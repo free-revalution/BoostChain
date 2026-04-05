@@ -37,6 +37,10 @@ public:
     // Clear all tools
     void clear();
 
+    // Copy tool definitions (name/schema only) from another registry
+    // Note: this copies definitions but not the actual tool instances
+    void copy_definitions_from(const ToolRegistry& other);
+
     // Number of registered tools
     size_t size() const;
 

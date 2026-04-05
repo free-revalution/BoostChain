@@ -37,6 +37,9 @@ public:
     // Clear all registered tools
     void clear();
 
+    // Copy all registered tools from another executor
+    void copy_tools_from(const ToolExecutor& other);
+
     // Permission management
     void set_permission_manager(PermissionManager* pm);
     PermissionManager* permission_manager() const;

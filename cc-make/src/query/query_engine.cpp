@@ -55,6 +55,11 @@ PermissionManager& QueryEngine::permission_manager() { return permission_manager
 const PermissionManager& QueryEngine::permission_manager() const { return permission_manager_; }
 void QueryEngine::set_permission_mode(PermissionMode mode) { permission_manager_.set_mode(mode); }
 
+void QueryEngine::copy_tool_functions_from(const QueryEngine& source) {
+    tool_executor_.copy_tools_from(source.tool_executor_);
+    tool_registry_.copy_definitions_from(source.tool_registry_);
+}
+
 const std::vector<Message>& QueryEngine::messages() const { return messages_; }
 
 void QueryEngine::interrupt() { abort_signal_.abort(); }

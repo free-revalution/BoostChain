@@ -44,6 +44,9 @@ public:
     const PermissionManager& permission_manager() const;
     void set_permission_mode(PermissionMode mode);
 
+    // Copy tool functions from another engine (for subagent spawning)
+    void copy_tool_functions_from(const QueryEngine& source);
+
     // Main entry point: submit a user message and run the agentic loop
     TurnResult submit_message(const std::string& prompt);
 
