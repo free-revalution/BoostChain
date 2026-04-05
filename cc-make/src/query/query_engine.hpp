@@ -5,11 +5,13 @@
 #include "tools/registry.hpp"
 #include "api/types.hpp"
 #include "permissions/permission_manager.hpp"
+#include "session/session.hpp"
 
 #include <string>
 #include <vector>
 #include <functional>
 #include <memory>
+#include <optional>
 
 namespace ccmake {
 
@@ -49,6 +51,11 @@ public:
     // Abort current query
     void interrupt();
 
+    // Session management
+    void set_session_id(const std::string& id);
+    std::string session_id() const;
+    void enable_auto_save(bool enabled);
+
     // Mock support for testing
     void set_mock_response(const Message& response);
     void set_mock_responses(const std::vector<Message>& responses);
@@ -69,6 +76,8 @@ private:
     std::vector<Message> messages_;
 
     AbortSignal abort_signal_;
+    std::string session_id_;
+    bool auto_save_ = false;
     bool use_mock_ = false;
     std::vector<Message> mock_responses_;
     size_t mock_index_ = 0;

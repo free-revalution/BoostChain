@@ -1,6 +1,7 @@
 #include "query/query_engine.hpp"
 #include "query/agentic_loop.hpp"
 #include "query/context.hpp"
+#include "config/config.hpp"
 
 #include <spdlog/spdlog.h>
 
@@ -57,6 +58,10 @@ void QueryEngine::set_permission_mode(PermissionMode mode) { permission_manager_
 const std::vector<Message>& QueryEngine::messages() const { return messages_; }
 
 void QueryEngine::interrupt() { abort_signal_.abort(); }
+
+void QueryEngine::set_session_id(const std::string& id) { session_id_ = id; }
+std::string QueryEngine::session_id() const { return session_id_; }
+void QueryEngine::enable_auto_save(bool enabled) { auto_save_ = enabled; }
 
 void QueryEngine::set_mock_response(const Message& response) {
     mock_responses_ = {response};
@@ -127,6 +132,16 @@ TurnResult QueryEngine::submit_message(const std::string& prompt) {
 
     // Update message history
     messages_ = result.messages;
+
+    // Auto-save session
+    if (auto_save_ && !session_id_.empty()) {
+        try {
+            SessionStore store(get_global_config_dir() / "sessions");
+            store.save_session(session_id_, messages_, model_, cwd_);
+        } catch (...) {
+            // Don't let save failures crash the engine
+        }
+    }
 
     return result;
 }

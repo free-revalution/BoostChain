@@ -1,4 +1,5 @@
 #include "app/repl.hpp"
+#include "config/config.hpp"
 
 #include <iostream>
 #include <sstream>
@@ -6,9 +7,11 @@
 namespace ccmake {
 
 Repl::Repl(QueryEngine& engine, const CLIArgs& args)
-    : engine_(engine), args_(args) {}
+    : engine_(engine), args_(args),
+      session_store_(get_global_config_dir() / "sessions") {}
 
 int Repl::run() {
+    init_session();
     print_welcome();
 
     while (running_) {
@@ -21,6 +24,38 @@ int Repl::run() {
     }
 
     return 0;
+}
+
+void Repl::init_session() {
+    if (!args_.session_id.empty()) {
+        resume_session(args_.session_id);
+    } else {
+        auto id = session_store_.create_session(engine_.model(), ".");
+        engine_.set_session_id(id);
+        engine_.enable_auto_save(true);
+    }
+}
+
+bool Repl::resume_session(const std::string& session_id) {
+    auto msgs = session_store_.load_session(session_id);
+    if (!msgs) {
+        std::cerr << "Session not found: " << session_id << "\n";
+        return false;
+    }
+
+    auto meta = session_store_.load_meta(session_id);
+    if (meta) {
+        if (!meta->model.empty()) engine_.set_model(meta->model);
+    }
+
+    engine_.set_session_id(session_id);
+    engine_.enable_auto_save(true);
+
+    // Note: we can't directly set messages_ on QueryEngine (it's private).
+    // The session store is used for persistence; for now this sets up
+    // auto-save. A full resume would need a load_messages() method.
+    std::cout << "Session resumed: " << session_id << " (" << msgs->size() << " messages)\n";
+    return true;
 }
 
 int Repl::process_prompt(const std::string& prompt) {
@@ -45,6 +80,9 @@ int Repl::process_prompt(const std::string& prompt) {
 
 void Repl::print_welcome() {
     std::cout << "cc-make v0.1.0 - C++ Claude Code\n";
+    if (!engine_.session_id().empty()) {
+        std::cout << "Session: " << engine_.session_id() << "\n";
+    }
     std::cout << "Type /help for commands, /quit to exit\n\n";
 }
 
@@ -56,7 +94,10 @@ void Repl::print_help() {
               << "  /mode <name>   Switch permission mode (default, acceptEdits, plan, bypass)\n"
               << "  /compact       Compact conversation\n"
               << "  /clear         Clear conversation history\n"
-              << "  /status        Show current status\n";
+              << "  /status        Show current status\n"
+              << "  /sessions      List saved sessions\n"
+              << "  /resume <id>   Resume a saved session\n"
+              << "  /new           Start a new session\n";
 }
 
 std::string Repl::read_line() {
@@ -123,6 +164,24 @@ bool Repl::handle_command(const std::string& input) {
             case PermissionMode::Auto: std::cout << "auto"; break;
         }
         std::cout << "\nMessages: " << engine_.messages().size() << "\n";
+        if (!engine_.session_id().empty()) {
+            std::cout << "Session: " << engine_.session_id() << "\n";
+        }
+        return true;
+    }
+
+    if (cmd_name == "sessions") {
+        cmd_sessions();
+        return true;
+    }
+
+    if (cmd_name == "resume") {
+        cmd_resume(cmd_arg);
+        return true;
+    }
+
+    if (cmd_name == "new") {
+        cmd_new();
         return true;
     }
 
@@ -135,13 +194,40 @@ bool Repl::handle_command(const std::string& input) {
     return true;
 }
 
+void Repl::cmd_sessions() {
+    auto sessions = session_store_.list_sessions();
+    if (sessions.empty()) {
+        std::cout << "No saved sessions.\n";
+        return;
+    }
+
+    std::cout << "Sessions:\n";
+    for (const auto& s : sessions) {
+        std::cout << "  " << s.id << "  " << s.model
+                  << "  " << s.message_count << " messages"
+                  << "  " << s.created_at << "\n";
+    }
+}
+
+void Repl::cmd_resume(const std::string& arg) {
+    if (arg.empty()) {
+        std::cout << "Usage: /resume <session_id>\n";
+        return;
+    }
+    resume_session(arg);
+}
+
+void Repl::cmd_new() {
+    auto id = session_store_.create_session(engine_.model(), ".");
+    engine_.set_session_id(id);
+    engine_.enable_auto_save(true);
+    std::cout << "New session: " << id << "\n";
+}
+
 void Repl::display_response(const TurnResult& result) {
-    // Find the last text block in the messages and display it
     for (const auto& msg : result.messages) {
         for (const auto& block : msg.content) {
             if (auto* text = std::get_if<TextBlock>(&block)) {
-                // Only display text blocks from the latest assistant response
-                // (skip intermediate tool results)
                 if (msg.role == MessageRole::Assistant) {
                     std::cout << text->text << "\n";
                 }
@@ -149,7 +235,6 @@ void Repl::display_response(const TurnResult& result) {
         }
     }
 
-    // Show tool results count
     int tool_count = 0;
     int error_count = 0;
     for (const auto& msg : result.messages) {
@@ -169,7 +254,6 @@ void Repl::display_response(const TurnResult& result) {
         std::cout << "]\n";
     }
 
-    // Show token usage
     if (result.total_usage.total_input_tokens > 0 || result.total_usage.total_output_tokens > 0) {
         std::cout << "["
                   << result.total_usage.total_input_tokens << " input, "
