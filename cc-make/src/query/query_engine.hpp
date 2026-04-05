@@ -4,6 +4,7 @@
 #include "query/tool_executor.hpp"
 #include "tools/registry.hpp"
 #include "api/types.hpp"
+#include "permissions/permission_manager.hpp"
 
 #include <string>
 #include <vector>
@@ -34,6 +35,11 @@ public:
     ToolRegistry& tool_registry();
     const ToolRegistry& tool_registry() const;
 
+    // Permission management
+    PermissionManager& permission_manager();
+    const PermissionManager& permission_manager() const;
+    void set_permission_mode(PermissionMode mode);
+
     // Main entry point: submit a user message and run the agentic loop
     TurnResult submit_message(const std::string& prompt);
 
@@ -59,6 +65,7 @@ private:
 
     ToolExecutor tool_executor_;
     ToolRegistry tool_registry_;
+    PermissionManager permission_manager_;
     std::vector<Message> messages_;
 
     AbortSignal abort_signal_;

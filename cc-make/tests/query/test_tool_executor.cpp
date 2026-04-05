@@ -1,5 +1,6 @@
 #include <catch2/catch_test_macros.hpp>
 #include "query/tool_executor.hpp"
+#include "permissions/permission_manager.hpp"
 #include <nlohmann/json.hpp>
 using namespace ccmake;
 
@@ -95,4 +96,132 @@ TEST_CASE("ToolExecutor clear removes all tools") {
     REQUIRE(executor.has_tool("x"));
     executor.clear();
     REQUIRE_FALSE(executor.has_tool("x"));
+}
+
+// ============================================================
+// Permission integration in ToolExecutor
+// ============================================================
+
+TEST_CASE("ToolExecutor bypasses without permission manager") {
+    ToolExecutor executor;
+    executor.register_tool("echo", [](const std::string&, const nlohmann::json& j) { return j; });
+    auto results = executor.execute({{"id", "echo", {{"text", "hi"}}}});
+    REQUIRE_FALSE(results[0].is_error);
+}
+
+TEST_CASE("ToolExecutor denied tool blocked") {
+    ToolExecutor executor;
+    PermissionManager pm;
+    pm.add_deny_rule("dangerous");
+    executor.set_permission_manager(&pm);
+
+    executor.register_tool("dangerous", [](const std::string&, const nlohmann::json&) {
+        return nlohmann::json("should not run");
+    });
+
+    auto results = executor.execute({{"id", "dangerous", {}}});
+    REQUIRE(results[0].is_error);
+    REQUIRE(results[0].permission_denied);
+    REQUIRE(results[0].content.find("Permission denied") != std::string::npos);
+}
+
+TEST_CASE("ToolExecutor allowed tool executes") {
+    ToolExecutor executor;
+    PermissionManager pm;
+    pm.add_allow_rule("safe");
+    executor.set_permission_manager(&pm);
+
+    executor.register_tool("safe", [](const std::string&, const nlohmann::json&) {
+        return nlohmann::json("executed");
+    });
+
+    auto results = executor.execute({{"id", "safe", {}}});
+    REQUIRE_FALSE(results[0].is_error);
+    REQUIRE_FALSE(results[0].permission_denied);
+    REQUIRE(results[0].content.find("executed") != std::string::npos);
+}
+
+TEST_CASE("ToolExecutor ask without callback blocks") {
+    ToolExecutor executor;
+    PermissionManager pm;
+    executor.set_permission_manager(&pm);
+
+    executor.register_tool("needs_approval", [](const std::string&, const nlohmann::json&) {
+        return nlohmann::json("should not run");
+    });
+
+    auto results = executor.execute({{"id", "needs_approval", {}}});
+    REQUIRE(results[0].is_error);
+    REQUIRE(results[0].permission_denied);
+}
+
+TEST_CASE("ToolExecutor ask with callback approved") {
+    ToolExecutor executor;
+    PermissionManager pm;
+    pm.set_approval_callback([](const std::string&, const std::string&) { return true; });
+    executor.set_permission_manager(&pm);
+
+    executor.register_tool("needs_approval", [](const std::string&, const nlohmann::json&) {
+        return nlohmann::json("approved");
+    });
+
+    auto results = executor.execute({{"id", "needs_approval", {}}});
+    REQUIRE_FALSE(results[0].is_error);
+    REQUIRE_FALSE(results[0].permission_denied);
+}
+
+TEST_CASE("ToolExecutor ask with callback denied") {
+    ToolExecutor executor;
+    PermissionManager pm;
+    pm.set_approval_callback([](const std::string&, const std::string&) { return false; });
+    executor.set_permission_manager(&pm);
+
+    executor.register_tool("needs_approval", [](const std::string&, const nlohmann::json&) {
+        return nlohmann::json("should not run");
+    });
+
+    auto results = executor.execute({{"id", "needs_approval", {}}});
+    REQUIRE(results[0].is_error);
+    REQUIRE(results[0].permission_denied);
+    REQUIRE(results[0].content.find("User denied") != std::string::npos);
+}
+
+TEST_CASE("ToolExecutor memoized approval skips callback") {
+    ToolExecutor executor;
+    PermissionManager pm;
+    int callback_count = 0;
+    pm.set_approval_callback([&callback_count](const std::string&, const std::string&) {
+        ++callback_count;
+        return true;
+    });
+    executor.set_permission_manager(&pm);
+
+    executor.register_tool("memo_test", [](const std::string&, const nlohmann::json&) {
+        return nlohmann::json("ok");
+    });
+
+    // First call triggers callback
+    auto r1 = executor.execute({{"id", "memo_test", {}}});
+    REQUIRE_FALSE(r1[0].is_error);
+    REQUIRE(callback_count == 1);
+
+    // Second call should be memoized (no callback)
+    auto r2 = executor.execute({{"id", "memo_test", {}}});
+    REQUIRE_FALSE(r2[0].is_error);
+    REQUIRE(callback_count == 1);  // not incremented
+}
+
+TEST_CASE("ToolExecutor bypass mode skips permission check") {
+    ToolExecutor executor;
+    PermissionManager pm;
+    pm.set_mode(PermissionMode::BypassPermissions);
+    executor.set_permission_manager(&pm);
+
+    executor.register_tool("any_tool", [](const std::string&, const nlohmann::json&) {
+        return nlohmann::json("bypassed");
+    });
+
+    auto results = executor.execute({{"id", "any_tool", {}}});
+    REQUIRE_FALSE(results[0].is_error);
+    REQUIRE_FALSE(results[0].permission_denied);
 }

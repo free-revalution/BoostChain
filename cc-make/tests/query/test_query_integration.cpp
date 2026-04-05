@@ -10,6 +10,7 @@ using namespace ccmake;
 TEST_CASE("Integration: multi-turn conversation") {
     QueryEngine engine("test-model");
     engine.set_cwd("/Users/jiang/development/BoostChain/cc-make");
+    engine.set_permission_mode(PermissionMode::BypassPermissions);
     engine.register_tool("calc", [](const std::string&, const nlohmann::json& j) {
         int a = j.value("a", 0);
         int b = j.value("b", 0);
@@ -40,6 +41,7 @@ TEST_CASE("Integration: multi-turn conversation") {
 TEST_CASE("Integration: abort during tool execution") {
     QueryEngine engine("test-model");
     engine.set_cwd("/Users/jiang/development/BoostChain/cc-make");
+    engine.set_permission_mode(PermissionMode::BypassPermissions);
     engine.register_tool("slow", [](const std::string&, const nlohmann::json&) -> nlohmann::json {
         return {{"result", "ok"}};
     });
@@ -83,6 +85,7 @@ TEST_CASE("Integration: system prompt assembly") {
 TEST_CASE("Integration: multi-tool execution in single turn") {
     QueryEngine engine("test-model");
     engine.set_cwd("/Users/jiang/development/BoostChain/cc-make");
+    engine.set_permission_mode(PermissionMode::BypassPermissions);
     engine.register_tool("add", [](const std::string&, const nlohmann::json& j) {
         return nlohmann::json{{"result", j.value("a", 0) + j.value("b", 0)}};
     });
@@ -114,6 +117,7 @@ TEST_CASE("Integration: multi-tool execution in single turn") {
 TEST_CASE("Integration: error handling in tool execution") {
     QueryEngine engine("test-model");
     engine.set_cwd("/Users/jiang/development/BoostChain/cc-make");
+    engine.set_permission_mode(PermissionMode::BypassPermissions);
     engine.register_tool("error_tool", [](const std::string&, const nlohmann::json&) -> nlohmann::json {
         throw std::runtime_error("something went wrong");
     });

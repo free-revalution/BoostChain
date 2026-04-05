@@ -1,6 +1,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include "query/query_engine.hpp"
 #include "core/types.hpp"
+#include "tools/file/read_tool.hpp"
 #include <nlohmann/json.hpp>
 using namespace ccmake;
 
@@ -55,6 +56,7 @@ TEST_CASE("QueryEngine submit_message accumulates messages") {
 TEST_CASE("QueryEngine interrupt doesn't crash") {
     QueryEngine engine("m");
     engine.set_cwd("/Users/jiang/development/BoostChain/cc-make");
+    engine.set_permission_mode(PermissionMode::BypassPermissions);
     engine.register_tool("echo", [](const std::string&, const nlohmann::json& j) { return j; });
     engine.set_mock_response(Message::assistant("a1", {
         ToolUseBlock{"t1", "echo", {{"wait", "forever"}}}
@@ -67,6 +69,7 @@ TEST_CASE("QueryEngine interrupt doesn't crash") {
 TEST_CASE("QueryEngine tool execution with echo") {
     QueryEngine engine("m");
     engine.set_cwd("/Users/jiang/development/BoostChain/cc-make");
+    engine.set_permission_mode(PermissionMode::BypassPermissions);
     engine.register_tool("echo", [](const std::string&, const nlohmann::json& j) { return j; });
     engine.set_mock_responses({
         Message::assistant("a1", {ToolUseBlock{"t1", "echo", {{"x", 42}}}}),
@@ -81,6 +84,7 @@ TEST_CASE("QueryEngine tool execution with echo") {
 TEST_CASE("QueryEngine max turns") {
     QueryEngine engine("m");
     engine.set_cwd("/Users/jiang/development/BoostChain/cc-make");
+    engine.set_permission_mode(PermissionMode::BypassPermissions);
     engine.set_max_turns(1);
     engine.set_mock_response(Message::assistant("a1", {
         ToolUseBlock{"t1", "echo", {{"x", 1}}}
@@ -105,4 +109,74 @@ TEST_CASE("QueryEngine set max tokens") {
     engine.set_mock_response(Message::assistant("a1", {TextBlock{"ok"}}));
     auto result = engine.submit_message("test");
     REQUIRE(result.exit_reason == LoopExitReason::Completed);
+}
+
+// ============================================================
+// Permission system integration
+// ============================================================
+
+TEST_CASE("QueryEngine permission_manager is accessible") {
+    QueryEngine engine("m");
+    REQUIRE(engine.permission_manager().mode() == PermissionMode::Default);
+    engine.set_permission_mode(PermissionMode::BypassPermissions);
+    REQUIRE(engine.permission_manager().mode() == PermissionMode::BypassPermissions);
+}
+
+TEST_CASE("QueryEngine denied tool returns permission error in agentic loop") {
+    QueryEngine engine("m");
+    engine.set_cwd("/Users/jiang/development/BoostChain/cc-make");
+    engine.register_tool(std::make_unique<ReadTool>());
+    engine.permission_manager().add_deny_rule("Read");
+
+    engine.set_mock_responses({
+        Message::assistant("a1", {ToolUseBlock{"t1", "Read", {{"file_path", "/tmp/test"}}}}),
+        Message::assistant("a2", {TextBlock{"Permission was denied."}})
+    });
+
+    auto result = engine.submit_message("Read a file");
+    REQUIRE(result.exit_reason == LoopExitReason::Completed);
+
+    // Check that a permission denied result exists in messages
+    bool found_denied = false;
+    for (const auto& msg : result.messages) {
+        for (const auto& block : msg.content) {
+            if (auto* tr = std::get_if<ToolResultBlock>(&block)) {
+                if (tr->is_error && tr->content.find("Permission denied") != std::string::npos) {
+                    found_denied = true;
+                }
+            }
+        }
+    }
+    REQUIRE(found_denied);
+}
+
+TEST_CASE("QueryEngine bypass mode allows all tools") {
+    QueryEngine engine("m");
+    engine.set_cwd("/Users/jiang/development/BoostChain/cc-make");
+    engine.set_permission_mode(PermissionMode::BypassPermissions);
+    engine.register_tool(std::make_unique<ReadTool>());
+
+    engine.set_mock_responses({
+        Message::assistant("a1", {ToolUseBlock{"t1", "Read", {{"file_path", "/tmp/test"}}}}),
+        Message::assistant("a2", {TextBlock{"Read successful."}})
+    });
+
+    auto result = engine.submit_message("Read a file");
+    REQUIRE(result.exit_reason == LoopExitReason::Completed);
+}
+
+TEST_CASE("QueryEngine allowed tool via rule executes in loop") {
+    QueryEngine engine("m");
+    engine.set_cwd("/Users/jiang/development/BoostChain/cc-make");
+    engine.register_tool(std::make_unique<ReadTool>());
+    engine.permission_manager().add_allow_rule("Read");
+
+    engine.set_mock_responses({
+        Message::assistant("a1", {ToolUseBlock{"t1", "Read", {{"file_path", "/tmp/test"}}}}),
+        Message::assistant("a2", {TextBlock{"Done."}})
+    });
+
+    auto result = engine.submit_message("Read a file");
+    REQUIRE(result.exit_reason == LoopExitReason::Completed);
+    REQUIRE(result.error_message.empty());
 }

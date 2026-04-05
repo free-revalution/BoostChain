@@ -1,6 +1,7 @@
 #pragma once
 
 #include "query/types.hpp"
+#include "permissions/permission_manager.hpp"
 
 #include <string>
 #include <vector>
@@ -15,6 +16,7 @@ public:
         std::string tool_name;
         std::string content;
         bool is_error = false;
+        bool permission_denied = false;
     };
 
     struct PendingTool {
@@ -35,11 +37,16 @@ public:
     // Clear all registered tools
     void clear();
 
+    // Permission management
+    void set_permission_manager(PermissionManager* pm);
+    PermissionManager* permission_manager() const;
+
 private:
     struct RegisteredTool {
         ToolExecuteFunction fn;
     };
     std::unordered_map<std::string, RegisteredTool> tools_;
+    PermissionManager* permission_manager_ = nullptr;
 };
 
 }  // namespace ccmake

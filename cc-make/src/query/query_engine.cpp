@@ -50,6 +50,10 @@ bool QueryEngine::register_tool(std::unique_ptr<ToolBase> tool) {
 ToolRegistry& QueryEngine::tool_registry() { return tool_registry_; }
 const ToolRegistry& QueryEngine::tool_registry() const { return tool_registry_; }
 
+PermissionManager& QueryEngine::permission_manager() { return permission_manager_; }
+const PermissionManager& QueryEngine::permission_manager() const { return permission_manager_; }
+void QueryEngine::set_permission_mode(PermissionMode mode) { permission_manager_.set_mode(mode); }
+
 const std::vector<Message>& QueryEngine::messages() const { return messages_; }
 
 void QueryEngine::interrupt() { abort_signal_.abort(); }
@@ -77,6 +81,10 @@ Message QueryEngine::next_mock_response() {
 
 TurnResult QueryEngine::submit_message(const std::string& prompt) {
     abort_signal_.reset();
+
+    // Wire permission manager to tool executor
+    permission_manager_.context();  // ensure initialized
+    tool_executor_.set_permission_manager(&permission_manager_);
 
     // Build context
     std::string cwd = cwd_.empty() ? "." : cwd_;

@@ -58,6 +58,7 @@ TEST_CASE("QueryEngine register ToolBase and execute via agentic loop") {
 
     QueryEngine engine("test-model");
     engine.set_cwd("/tmp");
+    engine.set_permission_mode(PermissionMode::BypassPermissions);
     engine.register_tool(std::make_unique<ReadTool>());
     engine.register_tool(std::make_unique<EditTool>());
 
@@ -175,6 +176,7 @@ TEST_CASE("Integration: Bash echo + Read verify") {
 
     QueryEngine engine("test-model");
     engine.set_cwd("/tmp");
+    engine.set_permission_mode(PermissionMode::BypassPermissions);
     engine.register_tool(std::make_unique<BashTool>());
     engine.register_tool(std::make_unique<ReadTool>());
 
@@ -204,6 +206,7 @@ TEST_CASE("Integration: Glob + Grep workflow") {
 
     QueryEngine engine("test-model");
     engine.set_cwd(dir);
+    engine.set_permission_mode(PermissionMode::BypassPermissions);
     engine.register_tool(std::make_unique<GlobTool>());
     engine.register_tool(std::make_unique<GrepTool>());
 
