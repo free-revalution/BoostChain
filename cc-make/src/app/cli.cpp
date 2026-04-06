@@ -12,6 +12,9 @@
 #include "tools/bash/bash_tool.hpp"
 #include "tools/search/glob_tool.hpp"
 #include "tools/search/grep_tool.hpp"
+#include "tools/worktree/worktree_tool.hpp"
+#include "tools/web/web_fetch_tool.hpp"
+#include "tools/web/web_search_tool.hpp"
 
 #include <CLI/CLI.hpp>
 #include <spdlog/spdlog.h>
@@ -234,6 +237,9 @@ int run_cli(int argc, char** argv) {
     engine.register_tool(std::make_unique<BashTool>());
     engine.register_tool(std::make_unique<GlobTool>());
     engine.register_tool(std::make_unique<GrepTool>());
+    engine.register_tool(std::make_unique<WorktreeTool>());
+    engine.register_tool(std::make_unique<WebFetchTool>());
+    engine.register_tool(std::make_unique<WebSearchTool>());
 
     // Create REPL
     Repl repl(engine, args);

@@ -3,12 +3,25 @@
 
 #include <iostream>
 #include <sstream>
+#include <iomanip>
 
 namespace ccmake {
 
 Repl::Repl(QueryEngine& engine, const CLIArgs& args)
     : engine_(engine), args_(args),
-      session_store_(get_global_config_dir() / "sessions") {}
+      session_store_(get_global_config_dir() / "sessions"),
+      theme_manager_(get_global_config_dir() / "themes") {
+    // Register all default commands
+    auto cmds = create_default_commands();
+    for (auto& cmd : cmds) {
+        command_registry_.register_command(cmd);
+    }
+}
+
+void Repl::set_mcp_manager(void* mgr) {
+    // mcp_manager_ = static_cast<McpManager*>(mgr);
+    (void)mgr;  // TODO: implement when McpManager is integrated
+}
 
 int Repl::run() {
     init_session();
@@ -91,17 +104,23 @@ void Repl::print_welcome() {
 }
 
 void Repl::print_help() {
-    std::cout << "Commands:\n"
-              << "  /help          Show this help\n"
-              << "  /quit          Exit cc-make\n"
-              << "  /model <name>  Switch model\n"
-              << "  /mode <name>   Switch permission mode (default, acceptEdits, plan, bypass)\n"
-              << "  /compact       Compact conversation\n"
-              << "  /clear         Clear conversation history\n"
-              << "  /status        Show current status\n"
-              << "  /sessions      List saved sessions\n"
-              << "  /resume <id>   Resume a saved session\n"
-              << "  /new           Start a new session\n";
+    std::cout << "Commands:\n";
+
+    // Built-in commands that need engine access (handled directly in handle_command)
+    std::cout << "  /model <name>   Switch model\n"
+              << "  /mode <name>    Switch permission mode\n"
+              << "  /sessions       List saved sessions\n"
+              << "  /resume <id>    Resume a saved session\n"
+              << "  /new            Start a new session\n";
+
+    // Commands from the registry
+    for (const auto& name : command_registry_.all_names()) {
+        auto* cmd = command_registry_.find(name);
+        if (cmd) {
+            std::cout << "  /" << std::left << std::setw(15) << name
+                      << cmd->description() << "\n";
+        }
+    }
 }
 
 std::string Repl::read_line() {
@@ -116,11 +135,13 @@ std::string Repl::read_line() {
 bool Repl::handle_command(const std::string& input) {
     if (input.empty() || input[0] != '/') return false;
 
+    // Parse command name and arguments
     auto cmd = input.substr(1);
     auto space = cmd.find(' ');
     std::string cmd_name = (space != std::string::npos) ? cmd.substr(0, space) : cmd;
     std::string cmd_arg = (space != std::string::npos) ? cmd.substr(space + 1) : "";
 
+    // Built-in commands that need direct engine access (handled directly)
     if (cmd_name == "quit" || cmd_name == "exit" || cmd_name == "q") {
         running_ = false;
         return true;
@@ -149,11 +170,6 @@ bool Repl::handle_command(const std::string& input) {
             engine_.set_permission_mode(mode);
             std::cout << "Permission mode set to: " << cmd_arg << "\n";
         }
-        return true;
-    }
-
-    if (cmd_name == "clear") {
-        std::cout << "Conversation cleared.\n";
         return true;
     }
 
@@ -189,8 +205,13 @@ bool Repl::handle_command(const std::string& input) {
         return true;
     }
 
-    if (cmd_name == "compact") {
-        std::cout << "Compact not yet implemented.\n";
+    // Delegate to CommandRegistry for all other commands
+    CommandContext ctx;
+    ctx.args = cmd_arg;
+    ctx.engine = &engine_;
+    ctx.repl = this;
+
+    if (command_registry_.execute(input, ctx)) {
         return true;
     }
 
