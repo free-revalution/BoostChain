@@ -154,4 +154,73 @@ std::vector<GitLogEntry> git_log(const std::filesystem::path& dir, int count) {
     return entries;
 }
 
+Result<std::vector<GitWorktree>, std::string> git_worktree_list(const std::filesystem::path& cwd) {
+    auto result = run_command("git worktree list --porcelain", cwd.string());
+    if (result.exit_code != 0) {
+        return Result<std::vector<GitWorktree>, std::string>::err(
+            "git worktree list failed: " + result.stderr_output);
+    }
+
+    std::vector<GitWorktree> worktrees;
+    auto lines = split(trim(result.stdout_output), '\n');
+
+    GitWorktree current;
+    bool first = true;
+    for (const auto& line : lines) {
+        if (starts_with(line, "worktree ")) {
+            if (!current.path.empty()) {
+                worktrees.push_back(std::move(current));
+            }
+            current = GitWorktree{};
+            current.path = trim(line.substr(9));
+            current.is_main = first;
+            first = false;
+        } else if (starts_with(line, "branch ")) {
+            std::string ref = trim(line.substr(7));
+            if (starts_with(ref, "refs/heads/")) {
+                current.branch = ref.substr(11);
+            } else {
+                current.branch = ref;
+            }
+        } else if (line == "bare") {
+            // bare repos don't have worktrees in the usual sense; skip
+            current.path.clear();
+        }
+    }
+    if (!current.path.empty()) {
+        worktrees.push_back(std::move(current));
+    }
+
+    return Result<std::vector<GitWorktree>, std::string>::ok(std::move(worktrees));
+}
+
+Result<bool, std::string> git_worktree_add(const std::filesystem::path& cwd, const std::string& path, const std::string& branch) {
+    // Check if the branch already exists
+    auto branch_check = run_command("git show-ref --verify --quiet refs/heads/" + branch, cwd.string());
+    std::string cmd;
+    if (branch_check.exit_code == 0) {
+        // Branch exists, checkout existing branch
+        cmd = "git worktree add " + path + " " + branch;
+    } else {
+        // Create new branch
+        cmd = "git worktree add " + path + " -b " + branch;
+    }
+
+    auto result = run_command(cmd, cwd.string());
+    if (result.exit_code != 0) {
+        return Result<bool, std::string>::err(
+            "git worktree add failed: " + result.stderr_output);
+    }
+    return Result<bool, std::string>::ok(true);
+}
+
+Result<bool, std::string> git_worktree_remove(const std::filesystem::path& cwd, const std::string& path) {
+    auto result = run_command("git worktree remove --force " + path, cwd.string());
+    if (result.exit_code != 0) {
+        return Result<bool, std::string>::err(
+            "git worktree remove failed: " + result.stderr_output);
+    }
+    return Result<bool, std::string>::ok(true);
+}
+
 }  // namespace ccmake
