@@ -11,6 +11,7 @@ Repl::Repl(QueryEngine& engine, const CLIArgs& args)
     : engine_(engine), args_(args),
       session_store_(get_global_config_dir() / "sessions"),
       theme_manager_(get_global_config_dir() / "themes") {
+    keybinding_manager_.load_defaults();
     // Register all default commands
     auto cmds = create_default_commands();
     for (auto& cmd : cmds) {
@@ -104,23 +105,11 @@ void Repl::print_welcome() {
 }
 
 void Repl::print_help() {
-    std::cout << "Commands:\n";
-
-    // Built-in commands that need engine access (handled directly in handle_command)
-    std::cout << "  /model <name>   Switch model\n"
-              << "  /mode <name>    Switch permission mode\n"
-              << "  /sessions       List saved sessions\n"
-              << "  /resume <id>    Resume a saved session\n"
-              << "  /new            Start a new session\n";
-
-    // Commands from the registry
-    for (const auto& name : command_registry_.all_names()) {
-        auto* cmd = command_registry_.find(name);
-        if (cmd) {
-            std::cout << "  /" << std::left << std::setw(15) << name
-                      << cmd->description() << "\n";
-        }
-    }
+    // Delegate to the help command in the registry
+    CommandContext ctx;
+    ctx.engine = &engine_;
+    ctx.repl = this;
+    command_registry_.execute("/help", ctx);
 }
 
 std::string Repl::read_line() {
@@ -135,118 +124,22 @@ std::string Repl::read_line() {
 bool Repl::handle_command(const std::string& input) {
     if (input.empty() || input[0] != '/') return false;
 
-    // Parse command name and arguments
-    auto cmd = input.substr(1);
-    auto space = cmd.find(' ');
-    std::string cmd_name = (space != std::string::npos) ? cmd.substr(0, space) : cmd;
-    std::string cmd_arg = (space != std::string::npos) ? cmd.substr(space + 1) : "";
-
-    // Built-in commands that need direct engine access (handled directly)
-    if (cmd_name == "quit" || cmd_name == "exit" || cmd_name == "q") {
-        running_ = false;
-        return true;
-    }
-
-    if (cmd_name == "help" || cmd_name == "h") {
-        print_help();
-        return true;
-    }
-
-    if (cmd_name == "model") {
-        if (cmd_arg.empty()) {
-            std::cout << "Current model: " << engine_.model() << "\n";
-        } else {
-            engine_.set_model(cmd_arg);
-            std::cout << "Model set to: " << cmd_arg << "\n";
-        }
-        return true;
-    }
-
-    if (cmd_name == "mode") {
-        if (cmd_arg.empty()) {
-            std::cout << "Usage: /mode <default|acceptEdits|plan|bypass>\n";
-        } else {
-            auto mode = parse_permission_mode(cmd_arg);
-            engine_.set_permission_mode(mode);
-            std::cout << "Permission mode set to: " << cmd_arg << "\n";
-        }
-        return true;
-    }
-
-    if (cmd_name == "status") {
-        std::cout << "Model: " << engine_.model() << "\n";
-        std::cout << "Permission mode: ";
-        switch (engine_.permission_manager().mode()) {
-            case PermissionMode::Default: std::cout << "default"; break;
-            case PermissionMode::AcceptEdits: std::cout << "acceptEdits"; break;
-            case PermissionMode::Plan: std::cout << "plan"; break;
-            case PermissionMode::BypassPermissions: std::cout << "bypassPermissions"; break;
-            case PermissionMode::Auto: std::cout << "auto"; break;
-        }
-        std::cout << "\nMessages: " << engine_.messages().size() << "\n";
-        if (!engine_.session_id().empty()) {
-            std::cout << "Session: " << engine_.session_id() << "\n";
-        }
-        return true;
-    }
-
-    if (cmd_name == "sessions") {
-        cmd_sessions();
-        return true;
-    }
-
-    if (cmd_name == "resume") {
-        cmd_resume(cmd_arg);
-        return true;
-    }
-
-    if (cmd_name == "new") {
-        cmd_new();
-        return true;
-    }
-
-    // Delegate to CommandRegistry for all other commands
+    // Delegate to CommandRegistry for all commands
     CommandContext ctx;
-    ctx.args = cmd_arg;
     ctx.engine = &engine_;
     ctx.repl = this;
 
     if (command_registry_.execute(input, ctx)) {
+        // Check if /quit was called (sets running_ to false)
         return true;
     }
 
+    // Command not found in registry
+    auto cmd = input.substr(1);
+    auto space = cmd.find(' ');
+    std::string cmd_name = (space != std::string::npos) ? cmd.substr(0, space) : cmd;
     std::cout << "Unknown command: /" << cmd_name << ". Type /help for commands.\n";
     return true;
-}
-
-void Repl::cmd_sessions() {
-    auto sessions = session_store_.list_sessions();
-    if (sessions.empty()) {
-        std::cout << "No saved sessions.\n";
-        return;
-    }
-
-    std::cout << "Sessions:\n";
-    for (const auto& s : sessions) {
-        std::cout << "  " << s.id << "  " << s.model
-                  << "  " << s.message_count << " messages"
-                  << "  " << s.created_at << "\n";
-    }
-}
-
-void Repl::cmd_resume(const std::string& arg) {
-    if (arg.empty()) {
-        std::cout << "Usage: /resume <session_id>\n";
-        return;
-    }
-    resume_session(arg);
-}
-
-void Repl::cmd_new() {
-    auto id = session_store_.create_session(engine_.model(), ".");
-    engine_.set_session_id(id);
-    engine_.enable_auto_save(true);
-    std::cout << "New session: " << id << "\n";
 }
 
 void Repl::display_response(const TurnResult& result) {

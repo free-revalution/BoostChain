@@ -8,12 +8,14 @@
 
 namespace ccmake {
 
+class QueryEngine;
+class Repl;
+
 // Context passed to command handlers
 struct CommandContext {
-    // Leave as opaque for now - will be populated in Phase 12.4
-    std::string args;     // Arguments after command name
-    void* engine = nullptr;   // QueryEngine* (opaque for header)
-    void* repl = nullptr;     // Repl* (opaque for header)
+    std::string args;                // Arguments after command name
+    QueryEngine* engine = nullptr;   // Access to query engine
+    Repl* repl = nullptr;            // Access to REPL (for running_, session_store_, etc.)
 };
 
 // Interface for a command

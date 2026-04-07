@@ -260,7 +260,7 @@ TEST_CASE("CommandRegistry double register same name keeps latest") {
 
 TEST_CASE("create_default_commands returns expected count") {
     auto cmds = create_default_commands();
-    REQUIRE(cmds.size() >= 16);
+    REQUIRE(cmds.size() >= 20);
 }
 
 TEST_CASE("create_default_commands has help") {
@@ -310,4 +310,115 @@ TEST_CASE("Default /quit command returns false") {
 
     bool result = registry.execute("/quit", {});
     REQUIRE(result == false);
+}
+
+TEST_CASE("create_default_commands has tools") {
+    auto cmds = create_default_commands();
+    bool found = false;
+    for (const auto& cmd : cmds) {
+        if (cmd->name() == "tools") { found = true; break; }
+    }
+    REQUIRE(found);
+}
+
+TEST_CASE("create_default_commands has diff") {
+    auto cmds = create_default_commands();
+    bool found = false;
+    for (const auto& cmd : cmds) {
+        if (cmd->name() == "diff") { found = true; break; }
+    }
+    REQUIRE(found);
+}
+
+TEST_CASE("create_default_commands has status") {
+    auto cmds = create_default_commands();
+    bool found = false;
+    for (const auto& cmd : cmds) {
+        if (cmd->name() == "status") { found = true; break; }
+    }
+    REQUIRE(found);
+}
+
+TEST_CASE("create_default_commands has theme") {
+    auto cmds = create_default_commands();
+    bool found = false;
+    for (const auto& cmd : cmds) {
+        if (cmd->name() == "theme") { found = true; break; }
+    }
+    REQUIRE(found);
+}
+
+TEST_CASE("create_default_commands has permissions") {
+    auto cmds = create_default_commands();
+    bool found = false;
+    for (const auto& cmd : cmds) {
+        if (cmd->name() == "permissions") { found = true; break; }
+    }
+    REQUIRE(found);
+}
+
+TEST_CASE("create_default_commands has memory") {
+    auto cmds = create_default_commands();
+    bool found = false;
+    for (const auto& cmd : cmds) {
+        if (cmd->name() == "memory") { found = true; break; }
+    }
+    REQUIRE(found);
+}
+
+TEST_CASE("create_default_commands has bug") {
+    auto cmds = create_default_commands();
+    bool found = false;
+    for (const auto& cmd : cmds) {
+        if (cmd->name() == "bug") { found = true; break; }
+    }
+    REQUIRE(found);
+}
+
+TEST_CASE("Default /diff command executes without engine") {
+    auto cmds = create_default_commands();
+    CommandRegistry registry;
+    for (const auto& cmd : cmds) {
+        registry.register_command(cmd);
+    }
+    bool result = registry.execute("/diff", {});
+    REQUIRE(result == true);
+}
+
+TEST_CASE("Default /status command executes without engine") {
+    auto cmds = create_default_commands();
+    CommandRegistry registry;
+    for (const auto& cmd : cmds) {
+        registry.register_command(cmd);
+    }
+    bool result = registry.execute("/status", {});
+    REQUIRE(result == true);
+}
+
+TEST_CASE("Default /memory command executes") {
+    auto cmds = create_default_commands();
+    CommandRegistry registry;
+    for (const auto& cmd : cmds) {
+        registry.register_command(cmd);
+    }
+    bool result = registry.execute("/memory", {});
+    REQUIRE(result == true);
+}
+
+TEST_CASE("Default /bug command executes") {
+    auto cmds = create_default_commands();
+    CommandRegistry registry;
+    for (const auto& cmd : cmds) {
+        registry.register_command(cmd);
+    }
+    bool result = registry.execute("/bug", {});
+    REQUIRE(result == true);
+}
+
+TEST_CASE("All commands have non-empty descriptions") {
+    auto cmds = create_default_commands();
+    for (const auto& cmd : cmds) {
+        REQUIRE_FALSE(cmd->description().empty());
+        REQUIRE_FALSE(cmd->name().empty());
+    }
 }
