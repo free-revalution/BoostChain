@@ -16,6 +16,9 @@
 #include "tools/web/web_fetch_tool.hpp"
 #include "tools/web/web_search_tool.hpp"
 #include "tools/agent/agent_tool.hpp"
+#include "tools/todo/todo_tool.hpp"
+#include "tools/ask/ask_question_tool.hpp"
+#include "tools/brief/brief_tool.hpp"
 
 #include <CLI/CLI.hpp>
 #include <spdlog/spdlog.h>
@@ -241,6 +244,9 @@ int run_cli(int argc, char** argv) {
     engine.register_tool(std::make_unique<WorktreeTool>());
     engine.register_tool(std::make_unique<WebFetchTool>());
     engine.register_tool(std::make_unique<WebSearchTool>());
+    engine.register_tool(std::make_unique<TodoWriteTool>());
+    engine.register_tool(std::make_unique<AskUserQuestionTool>());
+    engine.register_tool(std::make_unique<BriefTool>());
 
     // Register agent tool
     auto engine_factory = [&engine]() -> std::unique_ptr<QueryEngine> {

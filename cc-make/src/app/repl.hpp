@@ -67,10 +67,6 @@ private:
     KeybindingManager keybinding_manager_;
     bool running_ = true;
     bool vim_mode_ = false;
-
-    // TODO: McpManager* mcp_manager_ = nullptr;  // Set from CLI if available
-    // TODO: KeybindingManager keybinding_manager_;
-    // TODO: VimModeHandler vim_mode_;
 };
 
 }  // namespace ccmake
