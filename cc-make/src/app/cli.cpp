@@ -15,6 +15,7 @@
 #include "tools/worktree/worktree_tool.hpp"
 #include "tools/web/web_fetch_tool.hpp"
 #include "tools/web/web_search_tool.hpp"
+#include "tools/agent/agent_tool.hpp"
 
 #include <CLI/CLI.hpp>
 #include <spdlog/spdlog.h>
@@ -240,6 +241,14 @@ int run_cli(int argc, char** argv) {
     engine.register_tool(std::make_unique<WorktreeTool>());
     engine.register_tool(std::make_unique<WebFetchTool>());
     engine.register_tool(std::make_unique<WebSearchTool>());
+
+    // Register agent tool
+    auto engine_factory = [&engine]() -> std::unique_ptr<QueryEngine> {
+        auto child = std::make_unique<QueryEngine>(engine.model());
+        child->copy_tool_functions_from(engine);
+        return child;
+    };
+    engine.register_tool(std::make_unique<AgentTool>(engine_factory));
 
     // Create REPL
     Repl repl(engine, args);
